@@ -10,11 +10,6 @@ interface DatabaseError {
   clientVersion?: string
 }
 
-/**
- * Logger unificado para TypeORM
- * Implementa la interfaz Logger de TypeORM y extiende BaseLogger
- * Combina logging de queries, errores, migraciones y operaciones de BD
- */
 export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
   private readonly slowQueryThreshold: number
   private readonly enableQueryFormatting: boolean

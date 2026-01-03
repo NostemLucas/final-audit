@@ -18,18 +18,19 @@ interface DatabaseConfig {
 @Injectable()
 export class StartupLogger {
   private readonly logo = `
-  █████╗ ██╗   ██╗██████╗ ██╗████████╗██████╗
- ██╔══██╗██║   ██║██╔══██╗██║╚══██╔══╝╚════██╗
- ███████║██║   ██║██║  ██║██║   ██║    █████╔╝
- ██╔══██║██║   ██║██║  ██║██║   ██║   ██╔═══╝
- ██║  ██║╚██████╔╝██████╔╝██║   ██║   ███████╗
- ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝
+  █████╗ ██╗   ██╗██████╗ ██╗████████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔══██╗██║   ██║██╔══██╗██║╚══██╔══╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ███████║██║   ██║██║  ██║██║   ██║       ██║     ██║   ██║██████╔╝█████╗
+ ██╔══██║██║   ██║██║  ██║██║   ██║       ██║     ██║   ██║██╔══██╗██╔══╝
+ ██║  ██║╚██████╔╝██████╔╝██║   ██║       ╚██████╗╚██████╔╝██║  ██║███████╗
+ ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝        ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
   `
 
   printStartupBanner(appConfig: AppConfig, dbConfig?: DatabaseConfig): void {
-    console.clear()
+    console.log(chalk.bold.white('═'.repeat(85)))
+    //console.clear()
     console.log(chalk.cyan(this.logo))
-    console.log(chalk.bold.white('═'.repeat(60)))
+    console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
 
     // Información de la aplicación
@@ -74,7 +75,7 @@ export class StartupLogger {
 
     // Timestamp y estado
     console.log()
-    console.log(chalk.bold.white('═'.repeat(60)))
+    console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
     console.log(
       chalk.gray('  Started at:'),
@@ -87,13 +88,13 @@ export class StartupLogger {
       ),
     )
     console.log()
-    console.log(chalk.bold.white('═'.repeat(60)))
+    console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
   }
 
   printShutdown(reason?: string): void {
     console.log()
-    console.log(chalk.bold.white('═'.repeat(60)))
+    console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
     console.log(chalk.yellow('  ⚠ Application shutting down...'))
     if (reason) {
@@ -104,15 +105,15 @@ export class StartupLogger {
       chalk.white(new Date().toLocaleString('es-ES')),
     )
     console.log()
-    console.log(chalk.bold.white('═'.repeat(60)))
+    console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
   }
 
   printError(error: Error, context?: string): void {
     console.log()
-    console.log(chalk.bold.red('═'.repeat(60)))
+    console.log(chalk.bold.red('═'.repeat(85)))
     console.log(chalk.bold.red('  ✗ FATAL ERROR'))
-    console.log(chalk.bold.red('═'.repeat(60)))
+    console.log(chalk.bold.red('═'.repeat(85)))
     console.log()
     if (context) {
       console.log(chalk.red('  Context:'), chalk.white(context))
@@ -124,7 +125,7 @@ export class StartupLogger {
       console.log(chalk.gray(error.stack))
     }
     console.log()
-    console.log(chalk.bold.red('═'.repeat(60)))
+    console.log(chalk.bold.red('═'.repeat(85)))
     console.log()
   }
 

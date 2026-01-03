@@ -11,8 +11,22 @@ export class BaseLogger {
   }
 
   private createLogger(): winston.Logger {
+    // Definir niveles personalizados para winston
+    const customLevels = {
+      levels: {
+        error: 0,
+        warn: 1,
+        info: 2,
+        http: 3,
+        verbose: 4,
+        debug: 5,
+        silly: 6,
+      },
+    }
+
     return winston.createLogger({
-      level: process.env.LOG_LEVEL || LogLevel.INFO,
+      levels: customLevels.levels,
+      level: process.env.LOG_LEVEL || LogLevel.HTTP, // Cambiar default a HTTP para ver requests
       defaultMeta: { service: this.loggerName },
       transports: [
         this.createConsoleTransport(),

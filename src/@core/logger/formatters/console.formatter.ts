@@ -11,6 +11,34 @@ interface LogInfo {
     errorCode?: string
     errorMessage?: string
   }
+  request?: {
+    method?: string
+    url?: string
+    ip?: string
+    contentType?: string
+    query?: Record<string, unknown>
+    params?: Record<string, unknown>
+    body?: Record<string, unknown>
+  }
+  response?: {
+    statusCode?: number
+    responseTime?: number
+  }
+  user?: {
+    userId?: string
+    userEmail?: string
+    userName?: string
+  }
+  device?: {
+    os?: string
+    browser?: string
+    device?: string
+  }
+  error?: {
+    name?: string
+    message?: string
+    stack?: string
+  }
   additionalData?: Record<string, unknown>
   [key: string]: unknown
 }
@@ -78,8 +106,21 @@ function formatSQLBlock(query: string, level: string): string {
 
 export const consoleFormatter = winston.format.printf((info) => {
   const logInfo = info as LogInfo
-  const { timestamp, level, message, query, database, additionalData, service, ...metadata } =
-    logInfo
+  const {
+    timestamp,
+    level,
+    message,
+    query,
+    database,
+    request,
+    response,
+    user,
+    device,
+    error,
+    additionalData,
+    service,
+    ...metadata
+  } = logInfo
 
   // Obtener nivel sin colores ANSI
   const cleanLevel = (level ?? '').replace(/\u001b\[\d+m/g, '').toLowerCase()
@@ -107,9 +148,99 @@ export const consoleFormatter = winston.format.printf((info) => {
     output += ` ${operation}`
   }
 
+  // Si hay información de usuario, mostrarla en la misma línea
+  if (user?.userEmail) {
+    const userDisplay = chalk.gray(`👤 ${user.userEmail}`)
+    output += ` ${userDisplay}`
+  }
+
+  // Si hay información de request HTTP
+  if (request) {
+    const reqTitle = colorFn('\n  ┌─ Request:')
+    const reqData: string[] = []
+
+    if (request.method && request.url) {
+      reqData.push(`  │ ${chalk.bold('Endpoint')}: ${chalk.cyan(request.method)} ${chalk.cyan(request.url)}`)
+    }
+    if (request.ip) {
+      reqData.push(`  │ ${chalk.bold('IP')}: ${chalk.cyan(request.ip)}`)
+    }
+    if (request.contentType) {
+      reqData.push(`  │ ${chalk.bold('Content-Type')}: ${chalk.cyan(request.contentType)}`)
+    }
+    if (request.query && Object.keys(request.query).length > 0) {
+      reqData.push(`  │ ${chalk.bold('Query')}: ${formatJSON(request.query, 4)}`)
+    }
+    if (request.params && Object.keys(request.params).length > 0) {
+      reqData.push(`  │ ${chalk.bold('Params')}: ${formatJSON(request.params, 4)}`)
+    }
+    if (request.body && Object.keys(request.body).length > 0) {
+      reqData.push(`  │ ${chalk.bold('Body')}: ${formatJSON(request.body, 4)}`)
+    }
+
+    if (reqData.length > 0) {
+      output += `${reqTitle}\n${reqData.join('\n')}\n${colorFn('  └─')}`
+    }
+  }
+
+  // Si hay información de response HTTP
+  if (response) {
+    const resTitle = colorFn('\n  ┌─ Response:')
+    const resData: string[] = []
+
+    if (response.statusCode !== undefined) {
+      const statusColor =
+        response.statusCode >= 500
+          ? chalk.red
+          : response.statusCode >= 400
+            ? chalk.yellow
+            : chalk.green
+      resData.push(`  │ ${chalk.bold('Status')}: ${statusColor(response.statusCode)}`)
+    }
+    if (response.responseTime !== undefined) {
+      const timeColor = response.responseTime > 1000 ? chalk.red : chalk.green
+      resData.push(`  │ ${chalk.bold('Time')}: ${timeColor(response.responseTime + 'ms')}`)
+    }
+
+    if (resData.length > 0) {
+      output += `${resTitle}\n${resData.join('\n')}\n${colorFn('  └─')}`
+    }
+  }
+
+  // Si hay información de device
+  if (device) {
+    const deviceTitle = colorFn('\n  ┌─ Device:')
+    const deviceData: string[] = []
+
+    if (device.browser) deviceData.push(`  │ ${chalk.bold('Browser')}: ${chalk.cyan(device.browser)}`)
+    if (device.os) deviceData.push(`  │ ${chalk.bold('OS')}: ${chalk.cyan(device.os)}`)
+    if (device.device) deviceData.push(`  │ ${chalk.bold('Device')}: ${chalk.cyan(device.device)}`)
+
+    if (deviceData.length > 0) {
+      output += `${deviceTitle}\n${deviceData.join('\n')}\n${colorFn('  └─')}`
+    }
+  }
+
   // Si hay query SQL, formatearla de manera especial
   if (query) {
     output += formatSQLBlock(query, cleanLevel)
+  }
+
+  // Si hay información de error
+  if (error) {
+    const errorTitle = chalk.red('\n  ┌─ Error Details:')
+    const errorData: string[] = []
+
+    if (error.name) errorData.push(`  │ ${chalk.bold('Name')}: ${chalk.red(error.name)}`)
+    if (error.message) errorData.push(`  │ ${chalk.bold('Message')}: ${chalk.red(error.message)}`)
+    if (error.stack) {
+      const stackLines = error.stack.split('\n').map((line) => `  │   ${chalk.gray(line)}`)
+      errorData.push(`  │ ${chalk.bold('Stack')}:\n${stackLines.join('\n')}`)
+    }
+
+    if (errorData.length > 0) {
+      output += `${errorTitle}\n${errorData.join('\n')}\n${chalk.red('  └─')}`
+    }
   }
 
   // Si hay datos adicionales, mostrarlos de manera estructurada
@@ -135,6 +266,11 @@ export const consoleFormatter = winston.format.printf((info) => {
     'message',
     'query',
     'database',
+    'request',
+    'response',
+    'user',
+    'device',
+    'error',
     'additionalData',
     'service',
     'splat',
