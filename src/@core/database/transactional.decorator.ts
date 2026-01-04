@@ -2,6 +2,13 @@ import { Inject } from '@nestjs/common'
 import { TransactionService } from './transaction.service'
 
 /**
+ * Interfaz para clases que tienen TransactionService inyectado
+ */
+interface WithTransactionService {
+  transactionService: TransactionService
+}
+
+/**
  * Decorador que envuelve un método en una transacción automáticamente
  *
  * IMPORTANTE: La clase debe tener TransactionService inyectado
@@ -38,12 +45,15 @@ export function Transactional(): MethodDecorator {
 
     const originalMethod = descriptor.value
 
-    descriptor.value = async function (...args: unknown[]) {
-      const transactionService = (this as any).transactionService as TransactionService
+    descriptor.value = async function (
+      this: WithTransactionService,
+      ...args: unknown[]
+    ) {
+      const transactionService = this.transactionService
 
       if (!transactionService) {
         throw new Error(
-          `@Transactional() decorator requires TransactionService to be injected in ${target.constructor.name}`,
+          `@Transactional() decorator requires TransactionService to be injected`,
         )
       }
 

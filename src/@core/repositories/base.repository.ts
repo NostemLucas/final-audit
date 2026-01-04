@@ -31,10 +31,16 @@ export abstract class BaseRepository<
   protected getRepo(): Repository<T> {
     const contextEntityManager = this.cls.get<EntityManager>(ENTITY_MANAGER_KEY)
 
-    return (
-      contextEntityManager?.getRepository(this.repository.target) ??
-      this.repository
-    )
+    // Si hay un EntityManager en CLS y tiene el método getRepository, usarlo
+    if (
+      contextEntityManager &&
+      typeof contextEntityManager.getRepository === 'function'
+    ) {
+      return contextEntityManager.getRepository(this.repository.target)
+    }
+
+    // En cualquier otro caso, usar el repository por defecto
+    return this.repository
   }
 
   // ---------- Métodos de creación ----------
