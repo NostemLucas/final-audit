@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LoggerModule } from '@core/logger/logger.module';
 import { EmailModule } from '@core/email/email.module';
+import { DatabaseModule } from '@core/database';
 import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { LoggingInterceptor } from '@core/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from '@core/filters/http-exception.filter';
@@ -14,6 +15,7 @@ import { HttpExceptionFilter } from '@core/filters/http-exception.filter';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    DatabaseModule,
     LoggerModule,
     EmailModule,
   ],

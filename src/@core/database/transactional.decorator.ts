@@ -1,0 +1,58 @@
+import { Inject } from '@nestjs/common'
+import { TransactionService } from './transaction.service'
+
+/**
+ * Decorador que envuelve un método en una transacción automáticamente
+ *
+ * IMPORTANTE: La clase debe tener TransactionService inyectado
+ *
+ * @example
+ * ```typescript
+ * @Injectable()
+ * export class UserService {
+ *   constructor(
+ *     private readonly transactionService: TransactionService,
+ *     private readonly userRepository: UserRepository,
+ *   ) {}
+ *
+ *   @Transactional()
+ *   async createUserWithProfile(userData: CreateUserDto) {
+ *     // Todo dentro de esta función se ejecuta en una transacción
+ *     const user = await this.userRepository.save(userData)
+ *     const profile = await this.profileRepository.save({ userId: user.id })
+ *     return { user, profile }
+ *   }
+ * }
+ * ```
+ */
+export function Transactional(): MethodDecorator {
+  const injectTransactionService = Inject(TransactionService)
+
+  return (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor,
+  ) => {
+    // Inyectar TransactionService si no está inyectado
+    injectTransactionService(target, 'transactionService')
+
+    const originalMethod = descriptor.value
+
+    descriptor.value = async function (...args: unknown[]) {
+      const transactionService = (this as any).transactionService as TransactionService
+
+      if (!transactionService) {
+        throw new Error(
+          `@Transactional() decorator requires TransactionService to be injected in ${target.constructor.name}`,
+        )
+      }
+
+      // Ejecutar el método dentro de una transacción
+      return await transactionService.runInTransaction(async () => {
+        return await originalMethod.apply(this, args)
+      })
+    }
+
+    return descriptor
+  }
+}
