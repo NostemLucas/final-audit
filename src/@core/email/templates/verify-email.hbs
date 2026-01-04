@@ -1,0 +1,37 @@
+{{#> base}}
+  <div class="greeting">
+    Hola {{userName}},
+  </div>
+
+  <div class="message">
+    Gracias por registrarte en {{appName}}. Para completar tu registro y activar tu cuenta, necesitamos verificar tu dirección de correo electrónico.
+  </div>
+
+  <div style="text-align: center;">
+    <a href="{{verificationLink}}" class="button">Verificar Email</a>
+  </div>
+
+  <div class="info">
+    <strong>🔒 Verifica tu cuenta para:</strong>
+    <ul style="margin-left: 20px; margin-top: 10px;">
+      <li>Acceder a todas las funcionalidades</li>
+      <li>Mantener tu cuenta segura</li>
+      <li>Recibir notificaciones importantes</li>
+    </ul>
+  </div>
+
+  <div class="message">
+    Si el botón no funciona, puedes copiar y pegar el siguiente enlace en tu navegador:
+  </div>
+
+  <div class="message" style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; word-break: break-all; font-size: 14px; font-family: monospace;">
+    {{verificationLink}}
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="warning">
+    <strong>⚠️ ¿No te registraste?</strong><br>
+    Si no creaste una cuenta en {{appName}}, puedes ignorar este correo de forma segura.
+  </div>
+{{/base}}

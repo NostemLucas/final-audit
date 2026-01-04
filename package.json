@@ -27,7 +27,14 @@
     "migration:show": "npm run typeorm -- migration:show -d src/@core/database/data-source.ts",
     "seed:run": "ts-node -r tsconfig-paths/register src/@core/database/seeds/run-seeds.ts",
     "db:reset": "npm run migration:revert && npm run migration:run && npm run seed:run",
-    "db:setup": "npm run migration:run && npm run seed:run"
+    "db:setup": "npm run migration:run && npm run seed:run",
+    "email:test": "ts-node -r tsconfig-paths/register src/@core/email/email.test.ts",
+    "email:test:setup": "ts-node -r tsconfig-paths/register src/@core/email/email.test.ts setup",
+    "email:test:welcome": "ts-node -r tsconfig-paths/register src/@core/email/email.test.ts welcome",
+    "email:test:verify": "ts-node -r tsconfig-paths/register src/@core/email/email.test.ts verify",
+    "email:test:2fa": "ts-node -r tsconfig-paths/register src/@core/email/email.test.ts 2fa",
+    "email:test:reset": "ts-node -r tsconfig-paths/register src/@core/email/email.test.ts reset",
+    "email:template:create": "ts-node -r tsconfig-paths/register src/@core/email/scripts/create-template.ts"
   },
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",

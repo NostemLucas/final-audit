@@ -1,0 +1,33 @@
+{{#> base}}
+  <div class="greeting">
+    Hola {{userName}},
+  </div>
+
+  <div class="message">
+    Hemos recibido una solicitud de inicio de sesión en tu cuenta. Para completar el proceso, utiliza el siguiente código de verificación:
+  </div>
+
+  <div class="code-box">
+    <div class="code">{{code}}</div>
+  </div>
+
+  <div class="info">
+    <strong>⏱️ Código válido por {{expiresInMinutes}} minutos</strong><br>
+    Este código expirará en {{expiresInMinutes}} minutos. Si no solicitaste este código, por favor ignora este mensaje.
+  </div>
+
+  <div class="message">
+    Por seguridad:
+    <ul>
+      <li>No compartas este código con nadie</li>
+      <li>Nunca lo ingreses en sitios de terceros</li>
+      <li>Nuestro equipo nunca te pedirá este código por teléfono o email</li>
+    </ul>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="message" style="font-size: 14px; color: #6c757d;">
+    Si no intentaste iniciar sesión, te recomendamos cambiar tu contraseña inmediatamente y contactar con soporte.
+  </div>
+{{/base}}
