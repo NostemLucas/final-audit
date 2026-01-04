@@ -93,9 +93,10 @@ export class EmailService {
         }
       }
     } catch (error) {
-      this.logger.error(`Error enviando email a ${options.to}:`, error)
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      throw new Error(`Error al enviar email: ${message}`)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorStack = error instanceof Error ? error.stack : undefined
+      this.logger.error(`Error enviando email a ${options.to}: ${errorMessage}`, errorStack)
+      throw new Error(`Error al enviar email: ${errorMessage}`)
     }
   }
 

@@ -242,7 +242,7 @@ async function runAllTests() {
   let successCount = 0
   let errorCount = 0
 
-  for (const [key, test] of Object.entries(EMAIL_TESTS)) {
+  for (const [, test] of Object.entries(EMAIL_TESTS)) {
     console.log(chalk.green(`${test.icon} ${test.name}...`))
     try {
       await test.send(emailService, testEmail)

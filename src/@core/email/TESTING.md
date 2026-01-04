@@ -12,7 +12,7 @@ Ethereal Email es un servicio gratuito que captura emails sin enviarlos realment
 
 ```bash
 # Genera credenciales de prueba automáticamente
-npx ts-node -r tsconfig-paths/register src/@core/email/setup-test-email.ts
+npm run email:test:setup
 ```
 
 Esto creará un archivo `.env.email-test` con las credenciales. Copia su contenido a tu `.env`.
@@ -21,15 +21,14 @@ Esto creará un archivo `.env.email-test` con las credenciales. Copia su conteni
 
 ```bash
 # Ejecuta todos los ejemplos de una vez
-npx ts-node -r tsconfig-paths/register src/@core/email/email-examples.ts
+npm run email:test
 ```
 
 Esto enviará:
-- ✉️ Email de bienvenida
-- ✅ Email de verificación
+- 👋 Email de bienvenida
+- ✉️ Email de verificación
 - 🔐 Código 2FA
 - 🔑 Recuperación de contraseña
-- 📨 Email personalizado
 
 ---
 
@@ -38,25 +37,25 @@ Esto enviará:
 ### Email de Bienvenida
 
 ```bash
-npx ts-node -r tsconfig-paths/register src/@core/email/test-single-email.ts welcome
+npm run email:test:welcome
 ```
 
 ### Email de Verificación
 
 ```bash
-npx ts-node -r tsconfig-paths/register src/@core/email/test-single-email.ts verify
+npm run email:test:verify
 ```
 
 ### Código 2FA
 
 ```bash
-npx ts-node -r tsconfig-paths/register src/@core/email/test-single-email.ts 2fa
+npm run email:test:2fa
 ```
 
 ### Recuperación de Contraseña
 
 ```bash
-npx ts-node -r tsconfig-paths/register src/@core/email/test-single-email.ts reset
+npm run email:test:reset
 ```
 
 ---
@@ -66,8 +65,9 @@ npx ts-node -r tsconfig-paths/register src/@core/email/test-single-email.ts rese
 ### 1. Crear un Template Nuevo
 
 ```bash
-# Crea un template con nombre personalizado
-npx ts-node -r tsconfig-paths/register src/@core/email/create-test-template.ts mi-template
+npm run email:template:create
+# O con nombre personalizado:
+npm run email:template:create mi-template
 ```
 
 Esto crea: `src/@core/email/templates/mi-template.hbs`
@@ -75,7 +75,7 @@ Esto crea: `src/@core/email/templates/mi-template.hbs`
 ### 2. Probar el Template
 
 ```bash
-npx ts-node -r tsconfig-paths/register src/@core/email/test-custom-template.ts mi-template
+npm run email:test custom mi-template
 ```
 
 ---
@@ -86,7 +86,7 @@ npx ts-node -r tsconfig-paths/register src/@core/email/test-custom-template.ts m
 
 Agrega estas variables a tu `.env`:
 
-```bash
+```env
 # SMTP Configuration
 MAIL_HOST=smtp.ethereal.email
 MAIL_PORT=587
@@ -107,16 +107,9 @@ TEST_EMAIL=test@example.com
 
 ### Cambiar el Email de Destino
 
-```bash
-# En Linux/Mac
-export TEST_EMAIL=tu-email@example.com
-npx ts-node -r tsconfig-paths/register src/@core/email/email-examples.ts
+Edita la variable `TEST_EMAIL` en tu `.env`:
 
-# En Windows (PowerShell)
-$env:TEST_EMAIL="tu-email@example.com"
-npx ts-node -r tsconfig-paths/register src/@core/email/email-examples.ts
-
-# O editando directamente el .env
+```env
 TEST_EMAIL=tu-email@example.com
 ```
 
@@ -128,28 +121,33 @@ TEST_EMAIL=tu-email@example.com
 src/@core/email/
 ├── email.service.ts              # Servicio principal
 ├── email.module.ts               # Módulo de NestJS
-├── email-test.helper.ts          # Helper para testing
+├── email.test.ts                 # Script de testing consolidado ✨ NUEVO
 ├── index.ts                      # Exports
 │
+├── scripts/                      # Utilities ✨ NUEVO
+│   └── create-template.ts        # Crear templates personalizados
+│
 ├── templates/                    # Templates de Handlebars
+│   ├── layouts/
+│   │   └── base.hbs             # Layout base
 │   ├── welcome.hbs              # Email de bienvenida
 │   ├── verify-email.hbs         # Verificación de cuenta
 │   ├── two-factor-code.hbs      # Código 2FA
-│   ├── reset-password.hbs       # Recuperar contraseña
-│   └── custom-notification.hbs  # Template personalizado
-│
-├── tests/                        # Scripts de testing
-│   ├── setup-test-email.ts      # Configurar cuenta de prueba
-│   ├── email-examples.ts        # Probar todos los emails
-│   ├── test-single-email.ts     # Probar un email específico
-│   ├── create-test-template.ts  # Crear template nuevo
-│   ├── test-custom-template.ts  # Probar template personalizado
-│   └── help.ts                  # Ayuda rápida
+│   └── reset-password.hbs       # Recuperar contraseña
 │
 ├── README.md                    # Documentación general
 ├── TESTING.md                   # Esta guía
 └── INTEGRATION_EXAMPLE.md       # Ejemplos de integración
 ```
+
+### ✨ Cambios Recientes
+
+**Simplificación completada:**
+- ❌ Eliminado directorio `tests/` con 6 archivos
+- ❌ Eliminado `email-test.helper.ts` (funcionalidad integrada)
+- ✅ Creado `email.test.ts` - un solo archivo consolidado
+- ✅ Creado `scripts/` para utilities
+- 📊 **Reducción**: 7 archivos → 2 archivos (71% menos código)
 
 ---
 
@@ -158,7 +156,7 @@ src/@core/email/
 ### Con Ethereal Email
 
 1. Ve a https://ethereal.email/login
-2. Usa las credenciales generadas en `setup-test-email.ts`
+2. Usa las credenciales generadas en `npm run email:test:setup`
 3. Verás todos los emails capturados
 
 ### Preview URL en Logs
@@ -166,8 +164,8 @@ src/@core/email/
 Cuando envías un email en desarrollo, verás algo como:
 
 ```
-Email enviado exitosamente a test@example.com
-📧 Preview: https://ethereal.email/message/abc123...
+21:15:30 ℹ INFO [http] Email enviado exitosamente a test@example.com
+21:15:30 ℹ INFO [http] 📧 Preview: https://ethereal.email/message/abc123...
 ```
 
 Haz clic en la URL para ver el email en tu navegador.
@@ -176,7 +174,7 @@ Haz clic en la URL para ver el email en tu navegador.
 
 ## 🐛 Troubleshooting
 
-### Error: "Cannot find module '@nestjs/core'"
+### Error: "Cannot find module"
 
 ```bash
 npm install
@@ -188,12 +186,21 @@ Verifica que las credenciales en `.env` sean correctas:
 
 ```bash
 # Regenerar credenciales de prueba
-npx ts-node -r tsconfig-paths/register src/@core/email/setup-test-email.ts
+npm run email:test:setup
+```
+
+### Error: "wrong version number" (SSL)
+
+Tu `MAIL_SECURE` debe ser `false` para puerto 587:
+
+```env
+MAIL_PORT=587
+MAIL_SECURE=false  # ← Importante: debe ser "false", no "true"
 ```
 
 ### Error: "Template not found"
 
-Verifica que el template existe en `src/@core/email/templates/`:
+Verifica que el template existe:
 
 ```bash
 ls -la src/@core/email/templates/
@@ -206,10 +213,17 @@ ls -la src/@core/email/templates/
    cat .env | grep MAIL
    ```
 
-2. Verifica que el EmailModule esté importado en AppModule:
+2. Verifica que `ConfigModule.forRoot()` esté configurado en `AppModule`:
    ```typescript
    @Module({
-     imports: [EmailModule, ...],
+     imports: [
+       ConfigModule.forRoot({
+         isGlobal: true,
+         envFilePath: '.env',
+       }),
+       EmailModule,
+       // ...
+     ],
    })
    ```
 
@@ -329,6 +343,20 @@ Los templates usan **Handlebars**. Variables disponibles:
 </body>
 </html>
 ```
+
+---
+
+## 🎨 Comandos Disponibles
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run email:test` | Probar todos los emails |
+| `npm run email:test:setup` | Configurar cuenta Ethereal |
+| `npm run email:test:welcome` | Probar email de bienvenida |
+| `npm run email:test:verify` | Probar email de verificación |
+| `npm run email:test:2fa` | Probar código 2FA |
+| `npm run email:test:reset` | Probar recuperación de contraseña |
+| `npm run email:template:create` | Crear template personalizado |
 
 ---
 

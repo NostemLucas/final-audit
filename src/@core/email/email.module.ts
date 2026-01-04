@@ -7,6 +7,7 @@ import { EmailService } from './email.service'
 
 @Module({
   imports: [
+    ConfigModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -16,8 +17,8 @@ import { EmailService } from './email.service'
         return {
           transport: {
             host: configService.get<string>('MAIL_HOST'),
-            port: configService.get<number>('MAIL_PORT'),
-            secure: configService.get<boolean>('MAIL_SECURE') ?? false, // true for 465, false for other ports
+            port: parseInt(configService.get<string>('MAIL_PORT') || '587', 10),
+            secure: configService.get<string>('MAIL_SECURE') === 'true',
             auth: {
               user: configService.get<string>('MAIL_USER'),
               pass: configService.get<string>('MAIL_PASSWORD'),

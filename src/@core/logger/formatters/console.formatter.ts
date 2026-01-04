@@ -233,7 +233,7 @@ export const consoleFormatter = winston.format.printf((info) => {
 
     if (error.name) errorData.push(`  │ ${chalk.bold('Name')}: ${chalk.red(error.name)}`)
     if (error.message) errorData.push(`  │ ${chalk.bold('Message')}: ${chalk.red(error.message)}`)
-    if (error.stack) {
+    if (error.stack && typeof error.stack === 'string') {
       const stackLines = error.stack.split('\n').map((line) => `  │   ${chalk.gray(line)}`)
       errorData.push(`  │ ${chalk.bold('Stack')}:\n${stackLines.join('\n')}`)
     }

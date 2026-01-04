@@ -4,27 +4,38 @@ Este documento muestra cómo integrar el sistema de emails con el flujo de auten
 
 ## 1. Configurar Variables de Entorno
 
-Copia `.env.example` a `.env` y configura:
+### Generar credenciales de prueba (Recomendado)
 
 ```bash
+npm run email:test:setup
+```
+
+Esto creará `.env.email-test` con credenciales de Ethereal Email. Copia su contenido a tu `.env`.
+
+### O configurar manualmente
+
+Agrega estas variables a tu `.env`:
+
+```env
 # Para desarrollo - Usa Ethereal (gratis)
 MAIL_HOST=smtp.ethereal.email
 MAIL_PORT=587
 MAIL_SECURE=false
 MAIL_USER=tu-usuario@ethereal.email
 MAIL_PASSWORD=tu-password-ethereal
-MAIL_FROM=noreply@audit2.com
-MAIL_FROM_NAME=Audit2
-APP_NAME=Audit2
+MAIL_FROM=noreply@audit-core.com
+MAIL_FROM_NAME=Audit Core
+APP_NAME=Audit Core
+TEST_EMAIL=test@example.com
 
 FRONTEND_URL=http://localhost:3000
 ```
 
-**Obtener credenciales Ethereal:**
+**Obtener credenciales Ethereal manualmente:**
 
-1. Ve a https://ethereal.email/create
-2. Copia el usuario y contraseña
-3. Pégalos en tu `.env`
+1. Ejecuta `npm run email:test:setup`, O
+2. Ve a https://ethereal.email/create
+3. Copia las credenciales a tu `.env`
 4. Los emails aparecerán en https://ethereal.email/messages
 
 ## 2. Modificar AuthService para Enviar Emails
@@ -154,13 +165,40 @@ export class AuthService {
 }
 ```
 
-## 3. Actualizar AuthModule
+## 3. Configurar AppModule (IMPORTANTE)
+
+### Archivo: `src/app.module.ts`
+
+**El EmailModule requiere que ConfigModule esté configurado globalmente:**
+
+```typescript
+import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
+import { EmailModule } from '@core/email'
+import { AuthModule } from './core/auth/auth.module'
+
+@Module({
+  imports: [
+    // IMPORTANTE: ConfigModule debe estar primero y ser global
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+    EmailModule,
+    AuthModule,
+    // ... otros módulos
+  ],
+})
+export class AppModule {}
+```
+
+## 4. Actualizar AuthModule
 
 ### Archivo: `src/core/auth/auth.module.ts`
 
 ```typescript
 import { Module } from '@nestjs/common'
-import { EmailModule } from '@shared/email' // IMPORTANTE: Importar
+import { EmailModule } from '@core/email' // IMPORTANTE: Importar
 
 @Module({
   imports: [
@@ -172,7 +210,7 @@ import { EmailModule } from '@shared/email' // IMPORTANTE: Importar
 export class AuthModule {}
 ```
 
-## 4. Crear Endpoints en AuthController
+## 5. Crear Endpoints en AuthController
 
 ### Archivo: `src/core/auth/auth.controller.ts`
 
@@ -237,7 +275,7 @@ export class AuthController {
 }
 ```
 
-## 5. Actualizar OTP Entity (si es necesario)
+## 6. Actualizar OTP Entity (si es necesario)
 
 ### Archivo: `src/core/auth/domain/otp.entity.ts`
 
@@ -262,7 +300,7 @@ export class Otp {
 }
 ```
 
-## 6. Crear DTOs
+## 7. Crear DTOs
 
 ### Archivo: `src/core/auth/dto/forgot-password.dto.ts`
 
@@ -295,7 +333,7 @@ export class ResetPasswordDto {
 }
 ```
 
-## 7. Flujo Completo de Recuperación de Contraseña
+## 8. Flujo Completo de Recuperación de Contraseña
 
 ### Frontend → Backend
 
@@ -332,7 +370,7 @@ export class ResetPasswordDto {
    - Marca token como usado
    - (Opcional) Envía email de confirmación
 
-## 8. Flujo de 2FA
+## 9. Flujo de 2FA
 
 ### Durante Login
 
@@ -366,7 +404,20 @@ export class ResetPasswordDto {
    - Genera tokens JWT
    - Retorna tokens de acceso
 
-## 9. Testing Manual
+## 10. Testing Manual
+
+### Probar con Scripts Automatizados
+
+```bash
+# Probar todos los emails
+npm run email:test
+
+# Probar email específico
+npm run email:test:2fa
+npm run email:test:reset
+```
+
+### Probar con cURL
 
 ### Probar Email de 2FA
 
@@ -392,7 +443,7 @@ curl -X POST http://localhost:3000/auth/reset-password \
   -d '{"token":"TOKEN_FROM_EMAIL","newPassword":"NewPass123!"}'
 ```
 
-## 10. Verificar en Logs
+## 11. Verificar en Logs
 
 El sistema registrará:
 
