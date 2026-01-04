@@ -1,5 +1,5 @@
 import { BaseEntity } from '@core/entities'
-import type { DeepPartial, EntityManager } from 'typeorm'
+import type { DeepPartial } from 'typeorm'
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 
 export interface IBaseRepository<T extends BaseEntity> {
