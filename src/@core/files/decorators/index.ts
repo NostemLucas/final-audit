@@ -1,0 +1,5 @@
+export * from './upload-file.decorator'
+export * from './upload-image.decorator'
+export * from './upload-document.decorator'
+export * from './upload-pdf.decorator'
+export * from './upload-spreadsheet.decorator'
