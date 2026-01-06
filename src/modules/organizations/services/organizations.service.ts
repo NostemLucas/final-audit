@@ -4,6 +4,7 @@ import { CreateOrganizationDto, UpdateOrganizationDto } from '../dtos'
 import type { IOrganizationRepository } from '../repositories'
 import { ORGANIZATION_REPOSITORY } from '../repositories'
 import { OrganizationValidator } from '../validators/organization.validator'
+import { OrganizationFactory } from '../factories/organization.factory'
 import {
   OrganizationNotFoundException,
   OrganizationHasActiveUsersException,
@@ -16,6 +17,7 @@ export class OrganizationsService {
     @Inject(ORGANIZATION_REPOSITORY)
     private readonly organizationRepository: IOrganizationRepository,
     private readonly validator: OrganizationValidator,
+    private readonly organizationFactory: OrganizationFactory,
     private readonly filesService: FilesService,
   ) {}
 
@@ -27,9 +29,9 @@ export class OrganizationsService {
       createOrganizationDto.nit,
     )
 
-    const organization = this.organizationRepository.create(
-      createOrganizationDto,
-    )
+    // Crear organización usando el factory (normaliza datos automáticamente)
+    const organization =
+      this.organizationFactory.createFromDto(createOrganizationDto)
 
     return await this.organizationRepository.save(organization)
   }
@@ -78,9 +80,13 @@ export class OrganizationsService {
       await this.validator.validateUniqueNit(updateOrganizationDto.nit, id)
     }
 
-    Object.assign(organization, updateOrganizationDto)
+    // Actualizar organización usando el factory (normaliza datos automáticamente)
+    const updatedOrganization = this.organizationFactory.updateFromDto(
+      organization,
+      updateOrganizationDto,
+    )
 
-    return await this.organizationRepository.save(organization)
+    return await this.organizationRepository.save(updatedOrganization)
   }
 
   async uploadLogo(

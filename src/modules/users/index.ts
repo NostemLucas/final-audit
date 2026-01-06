@@ -1,21 +1,21 @@
 /**
- * API Pública del módulo Organizations
+ * API Pública del módulo Users
  *
  * ✅ EXPONER: Module, Entity, DTOs, Service, Exceptions
  * ❌ NO EXPONER: Repository, Factory, Validator, Controller
  */
 
 // 1. Module (SIEMPRE - para importar en AppModule)
-export * from './organizations.module'
+export * from './users.module'
 
-// 2. Entity (para tipos en otros módulos - ej: users tiene relación)
-export * from './entities/organization.entity'
+// 2. Entity (para tipos en otros módulos)
+export * from './entities/user.entity'
 
-// 3. DTOs (si otros módulos los usan)
+// 3. DTOs (si otros módulos los usan - ej: auth module)
 export * from './dtos'
 
-// 4. Service (si otros módulos lo necesitan)
-export * from './services/organizations.service'
+// 4. Service (si otros módulos lo necesitan - ej: auth module)
+export * from './services/users.service'
 
 // 5. Exceptions (para manejo de errores en otros módulos)
 export * from './exceptions'

@@ -5,6 +5,7 @@ import { OrganizationsController } from './controllers/organizations.controller'
 import { OrganizationsService } from './services/organizations.service'
 import { OrganizationRepository, ORGANIZATION_REPOSITORY } from './repositories'
 import { OrganizationValidator } from './validators/organization.validator'
+import { OrganizationFactory } from './factories/organization.factory'
 
 @Module({
   imports: [TypeOrmModule.forFeature([OrganizationEntity])],
@@ -12,6 +13,7 @@ import { OrganizationValidator } from './validators/organization.validator'
   providers: [
     OrganizationsService,
     OrganizationValidator,
+    OrganizationFactory,
     {
       provide: ORGANIZATION_REPOSITORY,
       useClass: OrganizationRepository,
