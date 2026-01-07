@@ -3,6 +3,7 @@ import { OrganizationsService } from './organizations.service'
 import type { IOrganizationRepository } from '../repositories'
 import { ORGANIZATION_REPOSITORY } from '../repositories'
 import { OrganizationValidator } from '../validators/organization.validator'
+import { OrganizationFactory } from '../factories/organization.factory'
 import { OrganizationEntity } from '../entities/organization.entity'
 import { CreateOrganizationDto, UpdateOrganizationDto } from '../dtos'
 import {
@@ -15,6 +16,7 @@ describe('OrganizationsService', () => {
   let service: OrganizationsService
   let repository: jest.Mocked<IOrganizationRepository>
   let validator: jest.Mocked<OrganizationValidator>
+  let factory: jest.Mocked<OrganizationFactory>
   let filesService: jest.Mocked<FilesService>
 
   const mockOrganization: OrganizationEntity = {
@@ -30,11 +32,10 @@ describe('OrganizationsService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: undefined,
-  } as OrganizationEntity
+  }
 
   beforeEach(async () => {
     const mockRepository: Partial<jest.Mocked<IOrganizationRepository>> = {
-      create: jest.fn(),
       save: jest.fn(),
       findAllActive: jest.fn(),
       findActiveById: jest.fn(),
@@ -49,6 +50,11 @@ describe('OrganizationsService', () => {
       validateUniqueConstraints: jest.fn(),
       validateUniqueName: jest.fn(),
       validateUniqueNit: jest.fn(),
+    }
+
+    const mockFactory: Partial<jest.Mocked<OrganizationFactory>> = {
+      createFromDto: jest.fn(),
+      updateFromDto: jest.fn(),
     }
 
     const mockFilesService: Partial<jest.Mocked<FilesService>> = {
@@ -71,6 +77,10 @@ describe('OrganizationsService', () => {
           useValue: mockValidator,
         },
         {
+          provide: OrganizationFactory,
+          useValue: mockFactory,
+        },
+        {
           provide: FilesService,
           useValue: mockFilesService,
         },
@@ -80,6 +90,7 @@ describe('OrganizationsService', () => {
     service = module.get<OrganizationsService>(OrganizationsService)
     repository = module.get(ORGANIZATION_REPOSITORY)
     validator = module.get(OrganizationValidator)
+    factory = module.get(OrganizationFactory)
     filesService = module.get(FilesService)
   })
 
@@ -101,7 +112,7 @@ describe('OrganizationsService', () => {
       // Arrange
       const createdOrg = { ...mockOrganization, ...createDto }
       validator.validateUniqueConstraints.mockResolvedValue(undefined)
-      repository.create.mockReturnValue(createdOrg)
+      factory.createFromDto.mockReturnValue(createdOrg)
       repository.save.mockResolvedValue(createdOrg)
 
       // Act
@@ -112,19 +123,21 @@ describe('OrganizationsService', () => {
         createDto.name,
         createDto.nit,
       )
-      expect(repository.create).toHaveBeenCalledWith(createDto)
+      expect(factory.createFromDto).toHaveBeenCalledWith(createDto)
       expect(repository.save).toHaveBeenCalledWith(createdOrg)
       expect(result).toBe(createdOrg)
     })
 
     it('should throw ConflictException when validation fails', async () => {
       // Arrange
-      const error = new Error('Ya existe una organización con el nombre "New Organization"')
+      const error = new Error(
+        'Ya existe una organización con el nombre "New Organization"',
+      )
       validator.validateUniqueConstraints.mockRejectedValue(error)
 
       // Act & Assert
       await expect(service.create(createDto)).rejects.toThrow(error)
-      expect(repository.create).not.toHaveBeenCalled()
+      expect(factory.createFromDto).not.toHaveBeenCalled()
       expect(repository.save).not.toHaveBeenCalled()
     })
   })
@@ -214,14 +227,23 @@ describe('OrganizationsService', () => {
       const updatedOrg = { ...mockOrganization, ...updateDto }
       repository.findActiveById.mockResolvedValue(mockOrganization)
       validator.validateUniqueName.mockResolvedValue(undefined)
+      factory.updateFromDto.mockReturnValue(updatedOrg)
       repository.save.mockResolvedValue(updatedOrg)
 
       // Act
       const result = await service.update('1', updateDto)
 
       // Assert
-      expect(validator.validateUniqueName).toHaveBeenCalledWith(updateDto.name, '1')
-      expect(repository.save).toHaveBeenCalled()
+      expect(repository.findActiveById).toHaveBeenCalledWith('1')
+      expect(validator.validateUniqueName).toHaveBeenCalledWith(
+        updateDto.name,
+        '1',
+      )
+      expect(factory.updateFromDto).toHaveBeenCalledWith(
+        mockOrganization,
+        updateDto,
+      )
+      expect(repository.save).toHaveBeenCalledWith(updatedOrg)
       expect(result).toEqual(updatedOrg)
     })
 
@@ -231,20 +253,30 @@ describe('OrganizationsService', () => {
       const updatedOrg = { ...mockOrganization, ...updateWithNit }
       repository.findActiveById.mockResolvedValue(mockOrganization)
       validator.validateUniqueNit.mockResolvedValue(undefined)
+      factory.updateFromDto.mockReturnValue(updatedOrg)
       repository.save.mockResolvedValue(updatedOrg)
 
       // Act
       await service.update('1', updateWithNit)
 
       // Assert
-      expect(validator.validateUniqueNit).toHaveBeenCalledWith(updateWithNit.nit, '1')
+      expect(validator.validateUniqueNit).toHaveBeenCalledWith(
+        updateWithNit.nit,
+        '1',
+      )
+      expect(factory.updateFromDto).toHaveBeenCalledWith(
+        mockOrganization,
+        updateWithNit,
+      )
     })
 
     it('should not validate name if it has not changed', async () => {
       // Arrange
       const updateDto: UpdateOrganizationDto = { description: 'New desc' }
+      const updatedOrg = { ...mockOrganization, description: 'New desc' }
       repository.findActiveById.mockResolvedValue(mockOrganization)
-      repository.save.mockResolvedValue(mockOrganization)
+      factory.updateFromDto.mockReturnValue(updatedOrg)
+      repository.save.mockResolvedValue(updatedOrg)
 
       // Act
       await service.update('1', updateDto)
@@ -252,6 +284,10 @@ describe('OrganizationsService', () => {
       // Assert
       expect(validator.validateUniqueName).not.toHaveBeenCalled()
       expect(validator.validateUniqueNit).not.toHaveBeenCalled()
+      expect(factory.updateFromDto).toHaveBeenCalledWith(
+        mockOrganization,
+        updateDto,
+      )
     })
 
     it('should throw OrganizationNotFoundException when organization not found', async () => {
@@ -262,6 +298,7 @@ describe('OrganizationsService', () => {
       await expect(service.update('999', updateDto)).rejects.toThrow(
         OrganizationNotFoundException,
       )
+      expect(factory.updateFromDto).not.toHaveBeenCalled()
     })
   })
 
@@ -295,6 +332,7 @@ describe('OrganizationsService', () => {
       const result = await service.uploadLogo('1', mockFile)
 
       // Assert
+      expect(repository.findActiveById).toHaveBeenCalledWith('1')
       expect(filesService.replaceFile).toHaveBeenCalledWith(
         null, // mockOrganization.logoUrl es null (sin logo previo)
         expect.objectContaining({
@@ -322,6 +360,7 @@ describe('OrganizationsService', () => {
       await expect(service.uploadLogo('999', mockFile)).rejects.toThrow(
         OrganizationNotFoundException,
       )
+      expect(filesService.replaceFile).not.toHaveBeenCalled()
     })
   })
 
@@ -337,6 +376,7 @@ describe('OrganizationsService', () => {
       await service.remove('1')
 
       // Assert
+      expect(repository.findActiveById).toHaveBeenCalledWith('1')
       expect(repository.countActiveUsers).toHaveBeenCalledWith('1')
       expect(repository.save).toHaveBeenCalled()
     })
@@ -361,6 +401,7 @@ describe('OrganizationsService', () => {
       await expect(service.remove('999')).rejects.toThrow(
         OrganizationNotFoundException,
       )
+      expect(repository.countActiveUsers).not.toHaveBeenCalled()
     })
   })
 

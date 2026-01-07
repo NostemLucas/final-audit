@@ -2,39 +2,14 @@ import { Injectable } from '@nestjs/common'
 import { MailerService } from '@nestjs-modules/mailer'
 import { ConfigService } from '@nestjs/config'
 import { LoggerService } from '@core/logger'
-
-interface SendEmailOptions {
-  to: string
-  subject: string
-  template: string
-  context: Record<string, unknown>
-}
-
-interface TwoFactorEmailData {
-  to: string
-  userName: string
-  code: string
-  expiresInMinutes: number
-}
-
-interface ResetPasswordEmailData {
-  to: string
-  userName: string
-  resetLink: string
-  expiresInMinutes: number
-}
-
-interface WelcomeEmailData {
-  to: string
-  userName: string
-  loginLink: string
-}
-
-interface VerifyEmailData {
-  to: string
-  userName: string
-  verificationLink: string
-}
+import * as nodemailer from 'nodemailer'
+import {
+  SendEmailOptions,
+  TwoFactorEmailData,
+  ResetPasswordEmailData,
+  WelcomeEmailData,
+  VerifyEmailData,
+} from './interfaces'
 
 /**
  * Servicio para envío de emails con templates HTML
@@ -67,6 +42,7 @@ export class EmailService {
    */
   private async sendEmail(options: SendEmailOptions): Promise<void> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const info = await this.mailerService.sendMail({
         to: options.to,
         from: `"${this.fromName}" <${this.fromEmail}>`,
@@ -85,17 +61,22 @@ export class EmailService {
 
       // En desarrollo, mostrar preview URL
       const isDevelopment = this.configService.get('NODE_ENV') !== 'production'
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (isDevelopment && info.messageId) {
-        const nodemailer = require('nodemailer')
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const previewUrl = nodemailer.getTestMessageUrl(info)
         if (previewUrl) {
           this.logger.log(`📧 Preview: ${previewUrl}`)
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error'
       const errorStack = error instanceof Error ? error.stack : undefined
-      this.logger.error(`Error enviando email a ${options.to}: ${errorMessage}`, errorStack)
+      this.logger.error(
+        `Error enviando email a ${options.to}: ${errorMessage}`,
+        errorStack,
+      )
       throw new Error(`Error al enviar email: ${errorMessage}`)
     }
   }

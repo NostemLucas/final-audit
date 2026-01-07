@@ -81,7 +81,7 @@ export interface DeleteFileOptions {
 
 /**
  * Interface del servicio de almacenamiento
-*/
+ */
 export interface IStorageService {
   /**
    * Guarda un archivo en el sistema de almacenamiento

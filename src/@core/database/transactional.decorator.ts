@@ -9,6 +9,11 @@ interface WithTransactionService {
 }
 
 /**
+ * Type para métodos asíncronos genéricos
+ */
+type AsyncMethod<T = unknown> = (...args: unknown[]) => Promise<T>
+
+/**
  * Decorador que envuelve un método en una transacción automáticamente
  *
  * IMPORTANTE: La clase debe tener TransactionService inyectado
@@ -37,18 +42,18 @@ export function Transactional(): MethodDecorator {
 
   return (
     target: object,
-    propertyKey: string | symbol,
+    _propertyKey: string | symbol,
     descriptor: PropertyDescriptor,
   ) => {
     // Inyectar TransactionService si no está inyectado
     injectTransactionService(target, 'transactionService')
 
-    const originalMethod = descriptor.value
+    const originalMethod = descriptor.value as AsyncMethod
 
     descriptor.value = async function (
       this: WithTransactionService,
       ...args: unknown[]
-    ) {
+    ): Promise<unknown> {
       const transactionService = this.transactionService
 
       if (!transactionService) {
@@ -59,7 +64,7 @@ export function Transactional(): MethodDecorator {
 
       // Ejecutar el método dentro de una transacción
       return await transactionService.runInTransaction(async () => {
-        return await originalMethod.apply(this, args)
+        return (await originalMethod.apply(this, args)) as unknown
       })
     }
 

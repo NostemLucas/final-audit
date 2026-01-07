@@ -34,15 +34,26 @@ npm run test:e2e           # Run end-to-end tests
 
 ### Database (TypeORM)
 ```bash
-npm run migration:generate -- src/database/migrations/MigrationName    # Generate migration
-npm run migration:create -- src/database/migrations/MigrationName      # Create empty migration
+# Setup & Management
+npm run db:create          # Create database if not exists
+npm run db:drop            # Drop database (⚠️ CAUTION: deletes all data)
+npm run db:setup           # Setup: create DB → run migrations → seed
+npm run db:reset           # Soft reset: revert → run migrations → seed
+npm run db:fresh           # Fresh start: drop → create → fresh migration → run → seed
+
+# Migrations
+npm run migration:generate -- src/@core/database/migrations/MigrationName  # Generate from entity changes
+npm run migration:create -- src/@core/database/migrations/MigrationName    # Create empty migration
+npm run migration:fresh    # Regenerate migrations from scratch (deletes old ones)
 npm run migration:run      # Run pending migrations
 npm run migration:revert   # Revert last migration
 npm run migration:show     # Show migration status
+
+# Seeds
 npm run seed:run           # Run database seeds
-npm run db:reset           # Revert, run migrations, and seed
-npm run db:setup           # Run migrations and seed
 ```
+
+**See [DATABASE_COMMANDS.md](./DATABASE_COMMANDS.md) for detailed command documentation.**
 
 ### Email Testing
 ```bash

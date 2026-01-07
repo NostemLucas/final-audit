@@ -55,7 +55,11 @@ async function createEtherealAccount() {
 /**
  * Guarda las credenciales en un archivo .env.email-test
  */
-function saveCredentials(credentials: ReturnType<typeof createEtherealAccount> extends Promise<infer T> ? T : never) {
+function saveCredentials(
+  credentials: ReturnType<typeof createEtherealAccount> extends Promise<infer T>
+    ? T
+    : never,
+) {
   const envContent = `# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Email Configuration (Ethereal Test Account)
 # Generado: ${new Date().toISOString()}
@@ -75,10 +79,15 @@ TEST_EMAIL=test@example.com`
   const envFilePath = path.join(process.cwd(), '.env.email-test')
   fs.writeFileSync(envFilePath, envContent)
 
-  console.log(chalk.green('✓ Configuración guardada en:'), chalk.white('.env.email-test'))
+  console.log(
+    chalk.green('✓ Configuración guardada en:'),
+    chalk.white('.env.email-test'),
+  )
   console.log('')
   console.log(chalk.yellow('📝 Siguientes pasos:'))
-  console.log(chalk.white('  1. Copia el contenido de .env.email-test a tu archivo .env'))
+  console.log(
+    chalk.white('  1. Copia el contenido de .env.email-test a tu archivo .env'),
+  )
   console.log(chalk.white('  2. O renombra .env.email-test a .env'))
   console.log('')
   console.log(chalk.yellow('🧪 Para probar:'))
@@ -171,7 +180,8 @@ async function runSetup() {
     saveCredentials(credentials)
     console.log(chalk.cyan('═'.repeat(70) + '\n'))
   } catch (error) {
-    console.error(chalk.red('\n❌ Error creando cuenta:'), error.message)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error(chalk.red('\n❌ Error creando cuenta:'), errorMessage)
     console.log('')
     console.log(chalk.yellow('💡 Alternativa:'))
     console.log(chalk.white('  1. Visita https://ethereal.email/create'))
@@ -249,17 +259,25 @@ async function runAllTests() {
       console.log(chalk.green(`  ✓ Enviado\n`))
       successCount++
     } catch (error) {
-      console.error(chalk.red(`  ✖ Error: ${error.message}\n`))
+      const errorMessage =
+        error instanceof Error ? error.message : String(error)
+      console.error(chalk.red(`  ✖ Error: ${errorMessage}\n`))
       errorCount++
     }
   }
 
   console.log(chalk.cyan('═'.repeat(70)))
-  console.log(chalk.bold.green(`  ✓ Completado: ${successCount} exitosos, ${errorCount} errores`))
+  console.log(
+    chalk.bold.green(
+      `  ✓ Completado: ${successCount} exitosos, ${errorCount} errores`,
+    ),
+  )
   console.log(chalk.cyan('═'.repeat(70) + '\n'))
 
   console.log(chalk.yellow('💡 Tips:'))
-  console.log(chalk.white('  - En desarrollo, usa Ethereal Email para ver los emails'))
+  console.log(
+    chalk.white('  - En desarrollo, usa Ethereal Email para ver los emails'),
+  )
   console.log(chalk.white('  - Revisa los logs para ver las URLs de preview'))
   console.log(chalk.white('  - Templates en: src/@core/email/templates/'))
   console.log('')
@@ -312,7 +330,7 @@ async function runCustomTemplateTest(templateName: string) {
       message: `Este es un email de prueba usando el template "${templateName}"`,
       actionUrl: 'https://audit-core.com/dashboard',
       actionText: 'Ver Dashboard',
-    }
+    },
   )
 
   console.log(chalk.green('✓ Email enviado exitosamente\n'))
@@ -357,7 +375,8 @@ function showHelp() {
   console.log('')
 
   console.log(chalk.yellow('⚙️  Variables de entorno (.env):\n'))
-  console.log(chalk.cyan(`  MAIL_HOST=smtp.ethereal.email
+  console.log(
+    chalk.cyan(`  MAIL_HOST=smtp.ethereal.email
   MAIL_PORT=587
   MAIL_SECURE=false
   MAIL_USER=tu-usuario@ethereal.email
@@ -365,7 +384,8 @@ function showHelp() {
   MAIL_FROM=noreply@audit-core.com
   MAIL_FROM_NAME=Audit Core
   APP_NAME=Audit Core
-  TEST_EMAIL=test@example.com`))
+  TEST_EMAIL=test@example.com`),
+  )
   console.log('')
 
   console.log(chalk.cyan('═'.repeat(70) + '\n'))
@@ -412,8 +432,9 @@ async function main() {
 
     process.exit(0)
   } catch (error) {
-    console.error(chalk.red('\n❌ Error:'), error.message)
-    if (error.stack) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error(chalk.red('\n❌ Error:'), errorMessage)
+    if (error instanceof Error && error.stack) {
       console.error(chalk.gray(error.stack))
     }
     process.exit(1)

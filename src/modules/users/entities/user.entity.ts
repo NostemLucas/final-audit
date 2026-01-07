@@ -1,4 +1,4 @@
-import { OrganizationEntity } from 'src/modules/organizations/entities'
+import { OrganizationEntity } from '../../organizations'
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm'
 import { BaseEntity } from '@core/entities/base.entity'
 

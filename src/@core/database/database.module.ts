@@ -12,17 +12,19 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 @Global()
 @Module({
   imports: [
-  TypeOrmModule.forRootAsync({
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (configService: ConfigService) => {
-          const dbConfig = configService.get<TypeOrmModuleOptions>('database');
-          if (!dbConfig) {
-            throw new Error('La configuración de la base de datos no fue cargada correctamente');
-          }
-          return dbConfig;
-        },
-      }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const dbConfig = configService.get<TypeOrmModuleOptions>('database')
+        if (!dbConfig) {
+          throw new Error(
+            'La configuración de la base de datos no fue cargada correctamente',
+          )
+        }
+        return dbConfig
+      },
+    }),
     ClsModule.forRoot({
       global: true,
       middleware: {

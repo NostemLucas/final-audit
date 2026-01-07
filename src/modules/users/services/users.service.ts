@@ -27,16 +27,16 @@ export class UsersService {
    * Hashea la contraseña automáticamente usando el UserFactory
    */
   @Transactional()
-  async create(createUserDto: CreateUserDto): Promise<UserEntity> {
+  async create(dto: CreateUserDto): Promise<UserEntity> {
     // Validar unicidad de email, username y CI
     await this.validator.validateUniqueConstraints(
-      createUserDto.email,
-      createUserDto.username,
-      createUserDto.ci,
+      dto.email,
+      dto.username,
+      dto.ci,
     )
 
     // Crear usuario usando el factory (hashea la contraseña automáticamente)
-    const user: UserEntity = this.userFactory.createFromDto(createUserDto)
+    const user = this.userFactory.createFromDto(dto)
 
     // Guardar en BD
     return await this.usersRepository.save(user)
@@ -100,24 +100,24 @@ export class UsersService {
    * NO actualiza la contraseña (se hace en módulo de autenticación)
    */
   @Transactional()
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<UserEntity> {
+  async update(id: string, dto: UpdateUserDto): Promise<UserEntity> {
     const user = await this.findOne(id)
 
     // Validar solo campos que cambiaron
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
-      await this.validator.validateUniqueEmail(updateUserDto.email, id)
+    if (dto.email && dto.email !== user.email) {
+      await this.validator.validateUniqueEmail(dto.email, id)
     }
 
-    if (updateUserDto.username && updateUserDto.username !== user.username) {
-      await this.validator.validateUniqueUsername(updateUserDto.username, id)
+    if (dto.username && dto.username !== user.username) {
+      await this.validator.validateUniqueUsername(dto.username, id)
     }
 
-    if (updateUserDto.ci && updateUserDto.ci !== user.ci) {
-      await this.validator.validateUniqueCI(updateUserDto.ci, id)
+    if (dto.ci && dto.ci !== user.ci) {
+      await this.validator.validateUniqueCI(dto.ci, id)
     }
 
     // Actualizar usuario usando el factory
-    const updatedUser = this.userFactory.updateFromDto(user, updateUserDto)
+    const updatedUser = this.userFactory.updateFromDto(user, dto)
 
     // Guardar cambios
     return await this.usersRepository.save(updatedUser)

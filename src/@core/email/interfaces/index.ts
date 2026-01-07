@@ -1,0 +1,5 @@
+export * from './send-email-options.interface'
+export * from './two-factor-email-data.interface'
+export * from './reset-password-email-data.interface'
+export * from './welcome-email-data.interface'
+export * from './verify-email-data.interface'
