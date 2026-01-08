@@ -1,7 +1,7 @@
-import { IBaseRepository } from "@core/repositories";
-import { OrganizationEntity } from "../entities";
+import { IBaseRepository } from '@core/repositories'
+import { OrganizationEntity } from '../entities'
 
-export interface IOrganizationRepository extends IBaseRepository<OrganizationEntity>{
+export interface IOrganizationRepository extends IBaseRepository<OrganizationEntity> {
   findByNit(nit: string): Promise<OrganizationEntity | null>
   findByName(name: string): Promise<OrganizationEntity | null>
   findAllActive(): Promise<OrganizationEntity[]>
@@ -9,4 +9,4 @@ export interface IOrganizationRepository extends IBaseRepository<OrganizationEnt
   findActiveByNit(nit: string): Promise<OrganizationEntity | null>
   countActiveUsers(organizationId: string): Promise<number>
   hardDelete(id: string): Promise<void>
-} 
+}

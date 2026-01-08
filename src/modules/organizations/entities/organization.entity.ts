@@ -1,12 +1,8 @@
-import {
-  Entity,
-  Column,
-} from 'typeorm'
+import { Entity, Column } from 'typeorm'
 import { BaseEntity } from '@core/entities'
 
 @Entity('organizations')
 export class OrganizationEntity extends BaseEntity {
-
   @Column({ type: 'varchar', length: 200, unique: true })
   name: string
 
@@ -30,5 +26,4 @@ export class OrganizationEntity extends BaseEntity {
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean
-
 }

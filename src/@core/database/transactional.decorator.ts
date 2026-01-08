@@ -1,29 +1,16 @@
-import { Inject } from '@nestjs/common'
 import { TransactionService } from './transaction.service'
-
-/**
- * Interfaz para clases que tienen TransactionService inyectado
- */
-interface WithTransactionService {
-  transactionService: TransactionService
-}
-
-/**
- * Type para métodos asíncronos genéricos
- */
-type AsyncMethod<T = unknown> = (...args: unknown[]) => Promise<T>
 
 /**
  * Decorador que envuelve un método en una transacción automáticamente
  *
- * IMPORTANTE: La clase debe tener TransactionService inyectado
+ * IMPORTANTE: La clase DEBE tener TransactionService inyectado en el constructor
  *
  * @example
  * ```typescript
  * @Injectable()
  * export class UserService {
  *   constructor(
- *     private readonly transactionService: TransactionService,
+ *     private readonly transactionService: TransactionService, // ✅ REQUERIDO
  *     private readonly userRepository: UserRepository,
  *   ) {}
  *
@@ -36,35 +23,49 @@ type AsyncMethod<T = unknown> = (...args: unknown[]) => Promise<T>
  *   }
  * }
  * ```
+ *
+ * Si olvidas inyectar TransactionService, obtendrás un error claro:
+ * "El decorador @Transactional() requiere que 'transactionService' esté inyectado en el constructor de UserService"
  */
-export function Transactional(): MethodDecorator {
-  const injectTransactionService = Inject(TransactionService)
+/**
+ * Interfaz para clases que tienen TransactionService inyectado
+ */
+interface WithTransactionService {
+  transactionService: TransactionService
+  constructor: { name: string }
+}
 
+export function Transactional(): MethodDecorator {
   return (
-    target: object,
+    _target: object,
     _propertyKey: string | symbol,
     descriptor: PropertyDescriptor,
   ) => {
-    // Inyectar TransactionService si no está inyectado
-    injectTransactionService(target, 'transactionService')
+    // Guardamos el método original
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const originalMethod = descriptor.value
 
-    const originalMethod = descriptor.value as AsyncMethod
-
+    // Reemplazamos el método
     descriptor.value = async function (
       this: WithTransactionService,
       ...args: unknown[]
     ): Promise<unknown> {
+      // ✅ Buscamos 'transactionService' en la instancia (debe estar en el constructor)
       const transactionService = this.transactionService
 
       if (!transactionService) {
         throw new Error(
-          `@Transactional() decorator requires TransactionService to be injected`,
+          `El decorador @Transactional() requiere que 'transactionService' esté inyectado en el constructor de ${this.constructor.name}. ` +
+            `Ejemplo: constructor(private readonly transactionService: TransactionService, ...) {}`,
         )
       }
 
-      // Ejecutar el método dentro de una transacción
+      // Envolvemos todo en la transacción
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return await transactionService.runInTransaction(async () => {
-        return (await originalMethod.apply(this, args)) as unknown
+        // Usamos apply para ejecutar el método original con el contexto 'this' correcto
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        return await originalMethod.apply(this, args)
       })
     }
 

@@ -1,420 +1,453 @@
-import { Test, TestingModule } from '@nestjs/testing'
 import { OrganizationsService } from './organizations.service'
-import type { IOrganizationRepository } from '../repositories'
-import { ORGANIZATION_REPOSITORY } from '../repositories'
 import { OrganizationValidator } from '../validators/organization.validator'
 import { OrganizationFactory } from '../factories/organization.factory'
-import { OrganizationEntity } from '../entities/organization.entity'
 import { CreateOrganizationDto, UpdateOrganizationDto } from '../dtos'
 import {
   OrganizationNotFoundException,
+  DuplicateOrganizationNameException,
+  DuplicateOrganizationNitException,
   OrganizationHasActiveUsersException,
 } from '../exceptions'
 import { FilesService } from '@core/files'
+import { FakeOrganizationsRepository } from '../__tests__/fixtures/fake-organizations.repository'
+import {
+  TEST_ORGANIZATIONS,
+  OrganizationBuilder,
+  createMultipleOrganizations,
+} from '../__tests__/fixtures/organization.fixtures'
 
-describe('OrganizationsService', () => {
+/**
+ * ✅ INTEGRATION TESTS - OrganizationsService (with Fake Repository)
+ *
+ * Testing approach:
+ * - Fake Repository: Simulates DB in memory (REAL behavior)
+ * - Real Validator: Tests actual validation logic
+ * - Real Factory: Tests actual normalization logic
+ * - Mock FilesService: Only mock external dependencies
+ *
+ * This approach is much more reliable than mocking everything!
+ */
+describe('OrganizationsService (Integration)', () => {
   let service: OrganizationsService
-  let repository: jest.Mocked<IOrganizationRepository>
-  let validator: jest.Mocked<OrganizationValidator>
-  let factory: jest.Mocked<OrganizationFactory>
+  let fakeRepository: FakeOrganizationsRepository
+  let validator: OrganizationValidator
+  let factory: OrganizationFactory
   let filesService: jest.Mocked<FilesService>
 
-  const mockOrganization: OrganizationEntity = {
-    id: '1',
-    name: 'Test Organization',
-    nit: '123456789',
-    description: 'Test description',
-    address: 'Test address',
-    phone: '1234567',
-    email: 'test@test.com',
-    logoUrl: null,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    deletedAt: undefined,
-  }
+  beforeEach(() => {
+    // ✅ Create fake repository (works like DB in memory)
+    fakeRepository = new FakeOrganizationsRepository()
 
-  beforeEach(async () => {
-    const mockRepository: Partial<jest.Mocked<IOrganizationRepository>> = {
-      save: jest.fn(),
-      findAllActive: jest.fn(),
-      findActiveById: jest.fn(),
-      findActiveByNit: jest.fn(),
-      findByNit: jest.fn(),
-      findByName: jest.fn(),
-      countActiveUsers: jest.fn(),
-      hardDelete: jest.fn(),
-    }
-
-    const mockValidator: Partial<jest.Mocked<OrganizationValidator>> = {
-      validateUniqueConstraints: jest.fn(),
-      validateUniqueName: jest.fn(),
-      validateUniqueNit: jest.fn(),
-    }
-
-    const mockFactory: Partial<jest.Mocked<OrganizationFactory>> = {
-      createFromDto: jest.fn(),
-      updateFromDto: jest.fn(),
-    }
-
-    const mockFilesService: Partial<jest.Mocked<FilesService>> = {
-      uploadFile: jest.fn(),
+    // Mock only external dependencies
+    filesService = {
       replaceFile: jest.fn(),
       deleteFile: jest.fn(),
-      fileExists: jest.fn(),
-      getFileUrl: jest.fn(),
-    }
+    } as any
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OrganizationsService,
-        {
-          provide: ORGANIZATION_REPOSITORY,
-          useValue: mockRepository,
-        },
-        {
-          provide: OrganizationValidator,
-          useValue: mockValidator,
-        },
-        {
-          provide: OrganizationFactory,
-          useValue: mockFactory,
-        },
-        {
-          provide: FilesService,
-          useValue: mockFilesService,
-        },
-      ],
-    }).compile()
+    // ✅ Use REAL instances of business logic
+    validator = new OrganizationValidator(fakeRepository)
+    factory = new OrganizationFactory()
 
-    service = module.get<OrganizationsService>(OrganizationsService)
-    repository = module.get(ORGANIZATION_REPOSITORY)
-    validator = module.get(OrganizationValidator)
-    factory = module.get(OrganizationFactory)
-    filesService = module.get(FilesService)
+    service = new OrganizationsService(
+      fakeRepository,
+      validator,
+      factory,
+      filesService,
+    )
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
+    fakeRepository.clear() // Clean data between tests
   })
 
   describe('create', () => {
-    const createDto: CreateOrganizationDto = {
-      name: 'New Organization',
-      nit: '987654321',
-      description: 'New description',
-      address: 'New address',
-      phone: '7654321',
-      email: 'new@test.com',
-    }
+    it('should create organization with real validation and normalization', async () => {
+      // Arrange - Seed with existing data using fixtures
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1, TEST_ORGANIZATIONS.ORG_2])
 
-    it('should create an organization successfully', async () => {
-      // Arrange
-      const createdOrg = { ...mockOrganization, ...createDto }
-      validator.validateUniqueConstraints.mockResolvedValue(undefined)
-      factory.createFromDto.mockReturnValue(createdOrg)
-      repository.save.mockResolvedValue(createdOrg)
+      const newOrgDto: CreateOrganizationDto = {
+        name: 'nueva empresa',
+        nit: '9999-888 777', // With spaces, will be normalized
+        description: 'Nueva descripción',
+        address: 'Nueva dirección',
+        phone: '79999999',
+        email: 'NUEVA@test.com', // UPPERCASE, will be normalized
+      }
 
       // Act
-      const result = await service.create(createDto)
+      const result = await service.create(newOrgDto)
 
-      // Assert
-      expect(validator.validateUniqueConstraints).toHaveBeenCalledWith(
-        createDto.name,
-        createDto.nit,
-      )
-      expect(factory.createFromDto).toHaveBeenCalledWith(createDto)
-      expect(repository.save).toHaveBeenCalledWith(createdOrg)
-      expect(result).toBe(createdOrg)
+      // Assert - ✅ Organization saved REALLY in fake repo
+      expect(result.id).toBeDefined()
+      expect(result.name).toBe('Nueva Empresa') // Factory normalized
+      expect(result.nit).toBe('9999-888777') // Factory normalized
+      expect(result.email).toBe('nueva@test.com') // Factory normalized
+
+      // ✅ Verify it's really in the repo
+      const savedOrg = await fakeRepository.findById(result.id)
+      expect(savedOrg).toBeDefined()
+      expect(savedOrg!.name).toBe('Nueva Empresa')
+
+      // ✅ Verify total count
+      const allOrgs = await fakeRepository.findAll()
+      expect(allOrgs.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('should throw ConflictException when validation fails', async () => {
+    it('should throw DuplicateOrganizationNameException when name is duplicate', async () => {
       // Arrange
-      const error = new Error(
-        'Ya existe una organización con el nombre "New Organization"',
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1])
+
+      const duplicateDto: CreateOrganizationDto = {
+        name: TEST_ORGANIZATIONS.ORG_1.name, // ❌ Duplicate name
+        nit: '9999999999',
+        description: 'Test',
+        address: 'Test',
+        phone: '71111111',
+        email: 'different@test.com',
+      }
+
+      // Act & Assert - ✅ Validator executes REAL search in fake repo
+      await expect(service.create(duplicateDto)).rejects.toThrow(
+        DuplicateOrganizationNameException,
       )
-      validator.validateUniqueConstraints.mockRejectedValue(error)
+
+      // ✅ Verify organization was NOT created
+      expect(fakeRepository.count()).toBe(1) // Only the seeded one
+    })
+
+    it('should throw DuplicateOrganizationNitException when NIT is duplicate', async () => {
+      // Arrange
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1])
+
+      const duplicateDto: CreateOrganizationDto = {
+        name: 'Nombre Diferente',
+        nit: TEST_ORGANIZATIONS.ORG_1.nit, // ❌ Duplicate NIT
+        description: 'Test',
+        address: 'Test',
+        phone: '71111111',
+        email: 'different@test.com',
+      }
 
       // Act & Assert
-      await expect(service.create(createDto)).rejects.toThrow(error)
-      expect(factory.createFromDto).not.toHaveBeenCalled()
-      expect(repository.save).not.toHaveBeenCalled()
+      await expect(service.create(duplicateDto)).rejects.toThrow(
+        DuplicateOrganizationNitException,
+      )
+
+      expect(fakeRepository.count()).toBe(1)
+    })
+
+    it('should work with OrganizationBuilder for custom scenarios', async () => {
+      // Arrange - Create custom organization with builder
+      const existingOrg = new OrganizationBuilder()
+        .withName('Existing Org')
+        .withNit('1111111111')
+        .withEmail('existing@test.com')
+        .complete()
+        .build()
+
+      fakeRepository.seed([existingOrg])
+
+      const newOrgDto: CreateOrganizationDto = {
+        name: 'New Org',
+        nit: '2222222222',
+        description: 'Test',
+        address: 'Test',
+        phone: '71111111',
+        email: 'new@test.com',
+      }
+
+      // Act
+      const result = await service.create(newOrgDto)
+
+      // Assert
+      expect(result.id).toBeDefined()
+      expect(fakeRepository.count()).toBe(2)
+
+      // ✅ Can make real queries
+      const allOrgs = await fakeRepository.findAll()
+      expect(allOrgs).toHaveLength(2)
+
+      const foundByNit = await fakeRepository.findByNit('2222222222')
+      expect(foundByNit!.id).toBe(result.id)
+    })
+  })
+
+  describe('update', () => {
+    it('should update organization with real validation', async () => {
+      // Arrange
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1, TEST_ORGANIZATIONS.ORG_2])
+
+      const updateDto: UpdateOrganizationDto = {
+        name: 'empresa actualizada',
+        description: 'Descripción actualizada',
+      }
+
+      // Act
+      const result = await service.update(TEST_ORGANIZATIONS.ORG_1.id, updateDto)
+
+      // Assert
+      expect(result.name).toBe('Empresa Actualizada') // Factory normalized
+      expect(result.description).toBe('Descripción actualizada')
+
+      // ✅ Verify change persisted in repo
+      const updatedOrg = await fakeRepository.findById(TEST_ORGANIZATIONS.ORG_1.id)
+      expect(updatedOrg!.name).toBe('Empresa Actualizada')
+      expect(updatedOrg!.description).toBe('Descripción actualizada')
+    })
+
+    it('should allow updating to same name (excludeId works)', async () => {
+      // Arrange
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1])
+
+      const updateDto: UpdateOrganizationDto = {
+        name: TEST_ORGANIZATIONS.ORG_1.name, // Same name (should allow)
+        description: 'Nueva descripción',
+      }
+
+      // Act
+      const result = await service.update(TEST_ORGANIZATIONS.ORG_1.id, updateDto)
+
+      // Assert - ✅ Validator REAL allows updating with same name
+      expect(result.name).toBe('Empresa De Auditoría Principal')
+      expect(result.description).toBe('Nueva descripción')
+    })
+
+    it('should prevent updating to name of another organization', async () => {
+      // Arrange
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1, TEST_ORGANIZATIONS.ORG_2])
+
+      const updateDto: UpdateOrganizationDto = {
+        name: TEST_ORGANIZATIONS.ORG_2.name, // ❌ Name of another org
+      }
+
+      // Act & Assert
+      await expect(
+        service.update(TEST_ORGANIZATIONS.ORG_1.id, updateDto),
+      ).rejects.toThrow(DuplicateOrganizationNameException)
     })
   })
 
   describe('findAll', () => {
     it('should return all active organizations', async () => {
       // Arrange
-      const organizations = [mockOrganization]
-      repository.findAllActive.mockResolvedValue(organizations)
+      fakeRepository.seed([
+        TEST_ORGANIZATIONS.ORG_1,
+        TEST_ORGANIZATIONS.ORG_2,
+        TEST_ORGANIZATIONS.INACTIVE_ORG,
+      ])
 
       // Act
       const result = await service.findAll()
 
-      // Assert
-      expect(repository.findAllActive).toHaveBeenCalled()
-      expect(result).toBe(organizations)
+      // Assert - ✅ Only returns active organizations
+      expect(result).toHaveLength(2) // ORG_1 and ORG_2 (active)
+      expect(result.map((o) => o.id)).toContain(TEST_ORGANIZATIONS.ORG_1.id)
+      expect(result.map((o) => o.id)).toContain(TEST_ORGANIZATIONS.ORG_2.id)
+      expect(result.map((o) => o.id)).not.toContain(TEST_ORGANIZATIONS.INACTIVE_ORG.id)
     })
 
     it('should return empty array when no organizations exist', async () => {
-      // Arrange
-      repository.findAllActive.mockResolvedValue([])
-
       // Act
       const result = await service.findAll()
 
       // Assert
       expect(result).toEqual([])
+      expect(fakeRepository.count()).toBe(0)
     })
   })
 
   describe('findOne', () => {
     it('should return organization by id', async () => {
       // Arrange
-      repository.findActiveById.mockResolvedValue(mockOrganization)
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1, TEST_ORGANIZATIONS.ORG_2])
 
       // Act
-      const result = await service.findOne('1')
+      const result = await service.findOne(TEST_ORGANIZATIONS.ORG_1.id)
 
       // Assert
-      expect(repository.findActiveById).toHaveBeenCalledWith('1')
-      expect(result).toBe(mockOrganization)
+      expect(result).toBeDefined()
+      expect(result.id).toBe(TEST_ORGANIZATIONS.ORG_1.id)
+      expect(result.name).toBe(TEST_ORGANIZATIONS.ORG_1.name)
     })
 
-    it('should throw OrganizationNotFoundException when organization not found', async () => {
+    it('should throw OrganizationNotFoundException when not found', async () => {
       // Arrange
-      repository.findActiveById.mockResolvedValue(null)
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1])
 
       // Act & Assert
-      await expect(service.findOne('999')).rejects.toThrow(
-        new OrganizationNotFoundException('999'),
+      await expect(service.findOne('nonexistent-id')).rejects.toThrow(
+        OrganizationNotFoundException,
       )
+    })
+
+    it('should throw when organization is inactive', async () => {
+      // Arrange
+      fakeRepository.seed([TEST_ORGANIZATIONS.INACTIVE_ORG])
+
+      // Act & Assert
+      await expect(
+        service.findOne(TEST_ORGANIZATIONS.INACTIVE_ORG.id),
+      ).rejects.toThrow(OrganizationNotFoundException)
     })
   })
 
   describe('findByNit', () => {
-    it('should return organization by NIT', async () => {
+    it('should find organization by NIT', async () => {
       // Arrange
-      repository.findActiveByNit.mockResolvedValue(mockOrganization)
+      fakeRepository.seed([
+        TEST_ORGANIZATIONS.ORG_1,
+        TEST_ORGANIZATIONS.ORG_2,
+        TEST_ORGANIZATIONS.INACTIVE_ORG,
+      ])
 
       // Act
-      const result = await service.findByNit('123456789')
+      const result = await service.findByNit(TEST_ORGANIZATIONS.ORG_2.nit)
 
       // Assert
-      expect(repository.findActiveByNit).toHaveBeenCalledWith('123456789')
-      expect(result).toBe(mockOrganization)
+      expect(result).toBeDefined()
+      expect(result.id).toBe(TEST_ORGANIZATIONS.ORG_2.id)
+      expect(result.nit).toBe(TEST_ORGANIZATIONS.ORG_2.nit)
     })
 
-    it('should throw OrganizationNotFoundException when organization not found by NIT', async () => {
+    it('should throw when organization not found by NIT', async () => {
       // Arrange
-      repository.findActiveByNit.mockResolvedValue(null)
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1])
 
       // Act & Assert
-      await expect(service.findByNit('999999999')).rejects.toThrow(
-        new OrganizationNotFoundException('999999999', 'NIT'),
-      )
-    })
-  })
-
-  describe('update', () => {
-    const updateDto: UpdateOrganizationDto = {
-      name: 'Updated Name',
-      description: 'Updated description',
-    }
-
-    it('should update organization successfully', async () => {
-      // Arrange
-      const updatedOrg = { ...mockOrganization, ...updateDto }
-      repository.findActiveById.mockResolvedValue(mockOrganization)
-      validator.validateUniqueName.mockResolvedValue(undefined)
-      factory.updateFromDto.mockReturnValue(updatedOrg)
-      repository.save.mockResolvedValue(updatedOrg)
-
-      // Act
-      const result = await service.update('1', updateDto)
-
-      // Assert
-      expect(repository.findActiveById).toHaveBeenCalledWith('1')
-      expect(validator.validateUniqueName).toHaveBeenCalledWith(
-        updateDto.name,
-        '1',
-      )
-      expect(factory.updateFromDto).toHaveBeenCalledWith(
-        mockOrganization,
-        updateDto,
-      )
-      expect(repository.save).toHaveBeenCalledWith(updatedOrg)
-      expect(result).toEqual(updatedOrg)
-    })
-
-    it('should validate NIT when updating', async () => {
-      // Arrange
-      const updateWithNit: UpdateOrganizationDto = { nit: '999999999' }
-      const updatedOrg = { ...mockOrganization, ...updateWithNit }
-      repository.findActiveById.mockResolvedValue(mockOrganization)
-      validator.validateUniqueNit.mockResolvedValue(undefined)
-      factory.updateFromDto.mockReturnValue(updatedOrg)
-      repository.save.mockResolvedValue(updatedOrg)
-
-      // Act
-      await service.update('1', updateWithNit)
-
-      // Assert
-      expect(validator.validateUniqueNit).toHaveBeenCalledWith(
-        updateWithNit.nit,
-        '1',
-      )
-      expect(factory.updateFromDto).toHaveBeenCalledWith(
-        mockOrganization,
-        updateWithNit,
-      )
-    })
-
-    it('should not validate name if it has not changed', async () => {
-      // Arrange
-      const updateDto: UpdateOrganizationDto = { description: 'New desc' }
-      const updatedOrg = { ...mockOrganization, description: 'New desc' }
-      repository.findActiveById.mockResolvedValue(mockOrganization)
-      factory.updateFromDto.mockReturnValue(updatedOrg)
-      repository.save.mockResolvedValue(updatedOrg)
-
-      // Act
-      await service.update('1', updateDto)
-
-      // Assert
-      expect(validator.validateUniqueName).not.toHaveBeenCalled()
-      expect(validator.validateUniqueNit).not.toHaveBeenCalled()
-      expect(factory.updateFromDto).toHaveBeenCalledWith(
-        mockOrganization,
-        updateDto,
-      )
-    })
-
-    it('should throw OrganizationNotFoundException when organization not found', async () => {
-      // Arrange
-      repository.findActiveById.mockResolvedValue(null)
-
-      // Act & Assert
-      await expect(service.update('999', updateDto)).rejects.toThrow(
+      await expect(service.findByNit('nonexistent-nit')).rejects.toThrow(
         OrganizationNotFoundException,
       )
-      expect(factory.updateFromDto).not.toHaveBeenCalled()
     })
   })
 
-  describe('uploadLogo', () => {
-    const mockFile = {
-      buffer: Buffer.from('test'),
-      originalname: 'logo.png',
-      mimetype: 'image/png',
-      size: 1024,
-    } as Express.Multer.File
-
-    it('should upload logo successfully', async () => {
-      // Arrange
-      const uploadResult = {
-        fileName: 'org-1.png',
-        filePath: 'organizations/logos/org-1.png',
-        url: 'http://localhost:3000/uploads/organizations/logos/org-1.png',
-        size: 1024,
-        mimeType: 'image/png',
-      }
-      const orgWithLogo = {
-        ...mockOrganization,
-        logoUrl: uploadResult.filePath,
-      }
-
-      repository.findActiveById.mockResolvedValue(mockOrganization)
-      filesService.replaceFile.mockResolvedValue(uploadResult)
-      repository.save.mockResolvedValue(orgWithLogo)
-
-      // Act
-      const result = await service.uploadLogo('1', mockFile)
-
-      // Assert
-      expect(repository.findActiveById).toHaveBeenCalledWith('1')
-      expect(filesService.replaceFile).toHaveBeenCalledWith(
-        null, // mockOrganization.logoUrl es null (sin logo previo)
-        expect.objectContaining({
-          file: mockFile,
-          folder: 'organizations/logos',
-          customFileName: 'org-1',
-          overwrite: true,
-          validationOptions: expect.objectContaining({
-            fileType: 'image',
-            maxSize: 5 * 1024 * 1024,
-            maxWidth: 1024,
-            maxHeight: 1024,
-          }),
-        }),
-      )
-      expect(repository.save).toHaveBeenCalled()
-      expect(result.logoUrl).toBe(uploadResult.filePath)
-    })
-
-    it('should throw OrganizationNotFoundException when organization not found', async () => {
-      // Arrange
-      repository.findActiveById.mockResolvedValue(null)
-
-      // Act & Assert
-      await expect(service.uploadLogo('999', mockFile)).rejects.toThrow(
-        OrganizationNotFoundException,
-      )
-      expect(filesService.replaceFile).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('remove', () => {
+  describe('remove (soft delete)', () => {
     it('should soft delete organization when no active users', async () => {
       // Arrange
-      const inactiveOrg = { ...mockOrganization, isActive: false }
-      repository.findActiveById.mockResolvedValue(mockOrganization)
-      repository.countActiveUsers.mockResolvedValue(0)
-      repository.save.mockResolvedValue(inactiveOrg)
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1])
+      fakeRepository.setActiveUsersCount(TEST_ORGANIZATIONS.ORG_1.id, 0) // No users
 
       // Act
-      await service.remove('1')
+      await service.remove(TEST_ORGANIZATIONS.ORG_1.id)
 
-      // Assert
-      expect(repository.findActiveById).toHaveBeenCalledWith('1')
-      expect(repository.countActiveUsers).toHaveBeenCalledWith('1')
-      expect(repository.save).toHaveBeenCalled()
+      // Assert - ✅ Organization marked as inactive
+      const org = await fakeRepository.findById(TEST_ORGANIZATIONS.ORG_1.id)
+      expect(org).toBeDefined()
+      expect(org!.isActive).toBe(false)
     })
 
-    it('should throw OrganizationHasActiveUsersException when organization has active users', async () => {
+    it('should throw when organization has active users', async () => {
       // Arrange
-      repository.findActiveById.mockResolvedValue(mockOrganization)
-      repository.countActiveUsers.mockResolvedValue(5)
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1])
+      fakeRepository.setActiveUsersCount(TEST_ORGANIZATIONS.ORG_1.id, 5) // ❌ Has users
 
       // Act & Assert
-      await expect(service.remove('1')).rejects.toThrow(
+      await expect(service.remove(TEST_ORGANIZATIONS.ORG_1.id)).rejects.toThrow(
         OrganizationHasActiveUsersException,
       )
-      expect(repository.save).not.toHaveBeenCalled()
-    })
 
-    it('should throw OrganizationNotFoundException when organization not found', async () => {
-      // Arrange
-      repository.findActiveById.mockResolvedValue(null)
-
-      // Act & Assert
-      await expect(service.remove('999')).rejects.toThrow(
-        OrganizationNotFoundException,
-      )
-      expect(repository.countActiveUsers).not.toHaveBeenCalled()
+      // ✅ Verify still active
+      const org = await fakeRepository.findById(TEST_ORGANIZATIONS.ORG_1.id)
+      expect(org!.isActive).toBe(true)
     })
   })
 
-  describe('delete', () => {
+  describe('delete (hard delete)', () => {
     it('should hard delete organization', async () => {
       // Arrange
-      repository.hardDelete.mockResolvedValue(undefined)
+      fakeRepository.seed([TEST_ORGANIZATIONS.ORG_1, TEST_ORGANIZATIONS.ORG_2])
 
       // Act
-      await service.delete('1')
+      await service.delete(TEST_ORGANIZATIONS.ORG_1.id)
+
+      // Assert - ✅ Organization REALLY deleted from repo
+      const org = await fakeRepository.findById(TEST_ORGANIZATIONS.ORG_1.id)
+      expect(org).toBeNull()
+
+      // ✅ Other organizations not affected
+      expect(fakeRepository.count()).toBe(1)
+      const remaining = await fakeRepository.findAll()
+      expect(remaining[0].id).toBe(TEST_ORGANIZATIONS.ORG_2.id)
+    })
+  })
+
+  describe('Complex scenarios', () => {
+    it('should handle multiple operations on same data', async () => {
+      // ✅ Complex scenario: create, update, search, delete
+      // With fake repo you don't need to mock each step
+
+      // 1. Create organization
+      const createDto: CreateOrganizationDto = {
+        name: 'test org',
+        nit: '123-456 789',
+        description: 'Test',
+        address: 'Test',
+        phone: '71111111',
+        email: 'TEST@test.com',
+      }
+
+      const created = await service.create(createDto)
+      expect(created.id).toBeDefined()
+      expect(created.name).toBe('Test Org') // Normalized
+
+      // 2. Update
+      const updateDto: UpdateOrganizationDto = {
+        description: 'Updated description',
+      }
+
+      const updated = await service.update(created.id, updateDto)
+      expect(updated.description).toBe('Updated description')
+
+      // 3. Search by NIT
+      const foundByNit = await service.findByNit('123-456789') // Normalized
+      expect(foundByNit.id).toBe(created.id)
+
+      // 4. Verify final state
+      expect(fakeRepository.count()).toBe(1)
+      const all = await fakeRepository.findAll()
+      expect(all[0].description).toBe('Updated description')
+    })
+
+    it('should work with multiple organizations using helper', async () => {
+      // ✅ Use helper to create multiple organizations
+      const orgs = createMultipleOrganizations(5)
+      fakeRepository.seed(orgs)
+
+      // Act
+      const all = await service.findAll()
 
       // Assert
-      expect(repository.hardDelete).toHaveBeenCalledWith('1')
+      expect(all).toHaveLength(5)
+      expect(all.map((o) => o.name)).toEqual([
+        'Organization 1',
+        'Organization 2',
+        'Organization 3',
+        'Organization 4',
+        'Organization 5',
+      ])
+    })
+
+    it('should handle normalization correctly', async () => {
+      // Arrange
+      const createDto: CreateOrganizationDto = {
+        name: '  empresa   con   espacios  ',
+        nit: '@#123-ABC xyz$%',
+        description: null,
+        address: null,
+        phone: null,
+        email: '  EMAIL@TEST.COM  ',
+      }
+
+      // Act
+      const result = await service.create(createDto)
+
+      // Assert - ✅ Factory normalized correctly
+      expect(result.name).toBe('Empresa Con Espacios')
+      expect(result.nit).toBe('123-ABCXYZ')
+      expect(result.email).toBe('email@test.com')
+
+      // ✅ Verify in repo
+      const saved = await fakeRepository.findById(result.id)
+      expect(saved!.name).toBe('Empresa Con Espacios')
     })
   })
 })

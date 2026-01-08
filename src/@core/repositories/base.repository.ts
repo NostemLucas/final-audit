@@ -25,8 +25,6 @@ export abstract class BaseRepository<
    * 1. Si hay una transacción activa en CLS, usa su EntityManager
    * 2. Si no, usa el repositorio por defecto
    *
-   * Este método se llama automáticamente en todos los métodos del repository
-   * No es necesario pasarle parámetros
    */
   protected getRepo(): Repository<T> {
     const contextEntityManager = this.cls.get<EntityManager>(ENTITY_MANAGER_KEY)

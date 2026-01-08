@@ -40,7 +40,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<RequestWithUser>()
 
     // Determinar el status code y mensaje
-    const { statusCode, message, error, details } = this.parseException(exception)
+    const { statusCode, message, error, details } =
+      this.parseException(exception)
 
     // Construir contexto de usuario
     const userContext = request.user
@@ -65,14 +66,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else {
       // Si no es un Error, loguear como unhandled
       this.logger.logUnhandledException(
-        new Error(typeof exception === 'string' ? exception : 'Unknown exception'),
+        new Error(
+          typeof exception === 'string' ? exception : 'Unknown exception',
+        ),
         {
           originalException: exception,
           statusCode,
           path: request.url,
           method: request.method,
           user: userContext,
-        }
+        },
       )
     }
 
@@ -114,9 +117,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const responseObj = response as Record<string, unknown>
         return {
           statusCode: status,
-          message: (responseObj.message as string | string[]) || exception.message,
+          message:
+            (responseObj.message as string | string[]) || exception.message,
           error: (responseObj.error as string) || exception.name,
-          details: process.env.NODE_ENV !== 'production' ? responseObj : undefined,
+          details:
+            process.env.NODE_ENV !== 'production' ? responseObj : undefined,
         }
       }
 
@@ -134,9 +139,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         message: exception.message || 'Internal server error',
         error: exception.name || 'Error',
-        details: process.env.NODE_ENV !== 'production' ? {
-          stack: exception.stack,
-        } : undefined,
+        details:
+          process.env.NODE_ENV !== 'production'
+            ? {
+                stack: exception.stack,
+              }
+            : undefined,
       }
     }
 

@@ -30,8 +30,9 @@ export class OrganizationsService {
     )
 
     // Crear organización usando el factory (normaliza datos automáticamente)
-    const organization =
-      this.organizationFactory.createFromDto(createOrganizationDto)
+    const organization = this.organizationFactory.createFromDto(
+      createOrganizationDto,
+    )
 
     return await this.organizationRepository.save(organization)
   }
@@ -120,7 +121,8 @@ export class OrganizationsService {
   async remove(id: string): Promise<void> {
     const organization = await this.findOne(id)
 
-    const activeUsersCount = await this.organizationRepository.countActiveUsers(id)
+    const activeUsersCount =
+      await this.organizationRepository.countActiveUsers(id)
 
     if (activeUsersCount > 0) {
       throw new OrganizationHasActiveUsersException()
@@ -134,4 +136,3 @@ export class OrganizationsService {
     await this.organizationRepository.hardDelete(id)
   }
 }
-

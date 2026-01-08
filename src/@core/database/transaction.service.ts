@@ -46,7 +46,6 @@ export class TransactionService {
     operation: (entityManager: EntityManager) => Promise<T>,
   ): Promise<T> {
     return await this.dataSource.transaction(async (entityManager) => {
-      // Guardar el EntityManager en CLS
       return await this.cls.run(async () => {
         this.cls.set(ENTITY_MANAGER_KEY, entityManager)
         return await operation(entityManager)
@@ -54,10 +53,6 @@ export class TransactionService {
     })
   }
 
-  /**
-   * Ejecuta una operación con un EntityManager específico en CLS
-   * Útil para testing o casos especiales donde ya tienes un EntityManager
-   */
   async runWithEntityManager<T>(
     entityManager: EntityManager,
     operation: () => Promise<T>,

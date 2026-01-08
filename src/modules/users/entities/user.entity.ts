@@ -60,18 +60,8 @@ export class UserEntity extends BaseEntity {
   @JoinColumn({ name: 'organizationId' })
   organization: OrganizationEntity
 
-  /**
-   * Roles del usuario (array de enums)
-   * Los permisos se derivan de estos roles usando getPermissionsForRoles() de @authorization
-   * @example [Role.ADMIN, Role.GERENTE]
-   */
   @Column({
     type: 'simple-array',
-    default: '',
-    transformer: {
-      to: (value: Role[]) => (value && value.length > 0 ? value.join(',') : ''),
-      from: (value: string) => (value ? (value.split(',') as Role[]) : []),
-    },
   })
   roles: Role[]
 

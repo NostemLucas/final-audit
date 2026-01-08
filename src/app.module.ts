@@ -1,15 +1,17 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { EmailModule } from '@core/email/email.module';
-import { DatabaseModule } from '@core/database';
-import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
-import { LoggerModule } from '@core/logger';
-import { HttpExceptionFilter } from '@core/filters';
-import { LoggingInterceptor } from '@core/interceptors';
-import { databaseConfig } from '@core/config';
-import { FilesModule } from '@core/files';
+import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
+import { EmailModule } from '@core/email/email.module'
+import { DatabaseModule } from '@core/database'
+import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core'
+import { LoggerModule } from '@core/logger'
+import { HttpExceptionFilter } from '@core/filters'
+import { LoggingInterceptor } from '@core/interceptors'
+import { databaseConfig } from '@core/config'
+import { FilesModule } from '@core/files'
+import { UsersModule } from './modules/users'
+import { OrganizationsModule } from './modules/organizations'
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { FilesModule } from '@core/files';
     FilesModule,
     LoggerModule,
     EmailModule,
+    OrganizationsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [
