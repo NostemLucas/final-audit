@@ -1,16 +1,22 @@
-import { TransactionService } from './transaction.service'
+import 'reflect-metadata'
 
 /**
- * Decorador que envuelve un método en una transacción automáticamente
+ * Clave de metadata para identificar métodos transaccionales
+ */
+export const TRANSACTIONAL_METADATA_KEY = Symbol('transactional')
+
+/**
+ * Decorador que marca un método para que se ejecute dentro de una transacción
  *
- * IMPORTANTE: La clase DEBE tener TransactionService inyectado en el constructor
+ * VENTAJA: Ya NO necesitas inyectar TransactionService en el constructor
+ * El sistema de Discovery automáticamente envuelve el método en una transacción
  *
  * @example
  * ```typescript
  * @Injectable()
  * export class UserService {
  *   constructor(
- *     private readonly transactionService: TransactionService, // ✅ REQUERIDO
+ *     // ✅ YA NO NECESITAS TransactionService aquí
  *     private readonly userRepository: UserRepository,
  *   ) {}
  *
@@ -23,51 +29,20 @@ import { TransactionService } from './transaction.service'
  *   }
  * }
  * ```
- *
- * Si olvidas inyectar TransactionService, obtendrás un error claro:
- * "El decorador @Transactional() requiere que 'transactionService' esté inyectado en el constructor de UserService"
  */
-/**
- * Interfaz para clases que tienen TransactionService inyectado
- */
-interface WithTransactionService {
-  transactionService: TransactionService
-  constructor: { name: string }
-}
-
 export function Transactional(): MethodDecorator {
   return (
-    _target: object,
-    _propertyKey: string | symbol,
+    target: object,
+    propertyKey: string | symbol,
     descriptor: PropertyDescriptor,
   ) => {
-    // Guardamos el método original
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const originalMethod = descriptor.value
-
-    // Reemplazamos el método
-    descriptor.value = async function (
-      this: WithTransactionService,
-      ...args: unknown[]
-    ): Promise<unknown> {
-      // ✅ Buscamos 'transactionService' en la instancia (debe estar en el constructor)
-      const transactionService = this.transactionService
-
-      if (!transactionService) {
-        throw new Error(
-          `El decorador @Transactional() requiere que 'transactionService' esté inyectado en el constructor de ${this.constructor.name}. ` +
-            `Ejemplo: constructor(private readonly transactionService: TransactionService, ...) {}`,
-        )
-      }
-
-      // Envolvemos todo en la transacción
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return await transactionService.runInTransaction(async () => {
-        // Usamos apply para ejecutar el método original con el contexto 'this' correcto
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        return await originalMethod.apply(this, args)
-      })
-    }
+    // Solo guardamos metadata para que el Discovery lo encuentre
+    Reflect.defineMetadata(
+      TRANSACTIONAL_METADATA_KEY,
+      true,
+      target,
+      propertyKey,
+    )
 
     return descriptor
   }

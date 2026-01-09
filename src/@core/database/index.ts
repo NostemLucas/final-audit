@@ -1,4 +1,6 @@
 export * from './database.module'
 export * from './transaction.service'
 export * from './transactional.decorator'
+export * from './transaction-discovery.service'
 export { ENTITY_MANAGER_KEY } from './transaction.service'
+export { TRANSACTIONAL_METADATA_KEY } from './transactional.decorator'

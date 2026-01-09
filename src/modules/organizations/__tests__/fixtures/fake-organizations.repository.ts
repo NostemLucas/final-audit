@@ -96,7 +96,7 @@ export class FakeOrganizationsRepository implements IOrganizationRepository {
     )
   }
 
-  async update(
+  update(
     id: string,
     partialEntity: QueryDeepPartialEntity<OrganizationEntity>,
   ): Promise<boolean> {

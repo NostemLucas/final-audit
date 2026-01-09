@@ -1,6 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { Transactional } from '@core/database'
-import { TransactionService } from '@core/database'
 import { FilesService, FileType } from '@core/files'
 import { USERS_REPOSITORY } from '../repositories'
 import type { IUsersRepository } from '../repositories'
@@ -17,7 +16,8 @@ export class UsersService {
     private readonly usersRepository: IUsersRepository,
     private readonly validator: UserValidator,
     private readonly userFactory: UserFactory,
-    private readonly transactionService: TransactionService,
+    // ✅ Ya NO necesitamos inyectar TransactionService
+    // El decorador @Transactional() usa Discovery automáticamente
     private readonly filesService: FilesService,
   ) {}
 
