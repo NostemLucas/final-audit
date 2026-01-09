@@ -10,15 +10,16 @@ import {
   HttpStatus,
   UploadedFile,
   BadRequestException,
+  Query,
 } from '@nestjs/common'
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger'
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger'
 import { UploadLogo } from '@core/files'
 import { OrganizationsService } from '../services/organizations.service'
-import { CreateOrganizationDto, UpdateOrganizationDto } from '../dtos'
+import {
+  CreateOrganizationDto,
+  UpdateOrganizationDto,
+  FindOrganizationsDto,
+} from '../dtos'
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -45,12 +46,91 @@ export class OrganizationsController {
 
   @Get()
   @ApiOperation({
-    summary: 'Obtener todas las organizaciones',
-    description: 'Retorna la lista de todas las organizaciones activas',
+    summary: 'Obtener organizaciones con paginación y filtros',
+    description:
+      'Retorna organizaciones con soporte para paginación, búsqueda y filtros',
   })
-  @ApiResponse({ status: 200, description: 'Lista de organizaciones' })
-  async findAll() {
-    return await this.organizationsService.findAll()
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Registros por página (default: 10, max: 100)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'all',
+    required: false,
+    description: 'Devolver todos los registros sin paginación',
+    example: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'Campo para ordenar (ej: createdAt, name)',
+    example: 'createdAt',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    description: 'Orden ASC o DESC',
+    example: 'DESC',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Búsqueda de texto libre (nombre, NIT, descripción, email)',
+    example: 'coca cola',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    description: 'Filtrar por estado activo/inactivo',
+    example: true,
+  })
+  @ApiQuery({
+    name: 'hasLogo',
+    required: false,
+    description: 'Filtrar organizaciones con/sin logo',
+    example: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Respuesta paginada con organizaciones',
+    schema: {
+      example: {
+        data: [
+          {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            name: 'Coca Cola Bolivia',
+            nit: '1234567890',
+            description: 'Empresa de bebidas',
+            address: 'Av. Siempre Viva 123',
+            phone: '12345678',
+            email: 'info@cocacola.bo',
+            logoUrl: '/uploads/organizations/logos/org-123.png',
+            isActive: true,
+            createdAt: '2024-01-15T10:30:00Z',
+            updatedAt: '2024-01-15T10:30:00Z',
+          },
+        ],
+        meta: {
+          total: 100,
+          page: 1,
+          limit: 10,
+          totalPages: 10,
+          hasNextPage: true,
+          hasPrevPage: false,
+        },
+      },
+    },
+  })
+  async findAll(@Query() query: FindOrganizationsDto) {
+    return await this.organizationsService.findWithFilters(query)
   }
 
   @Get(':id')
@@ -91,7 +171,8 @@ export class OrganizationsController {
   @HttpCode(HttpStatus.OK)
   @UploadLogo({
     maxSize: 5 * 1024 * 1024, // 5MB
-    description: 'Subir logo de la organización (JPG, PNG, WebP, SVG). Tamaño máximo: 5MB',
+    description:
+      'Subir logo de la organización (JPG, PNG, WebP, SVG). Tamaño máximo: 5MB',
   })
   @ApiOperation({
     summary: 'Subir logo de la organización',

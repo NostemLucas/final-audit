@@ -57,7 +57,9 @@ describe('OrganizationValidator', () => {
       repository.findByNit.mockResolvedValue(null)
 
       // Act & Assert
-      await expect(validator.validateUniqueNit('999999999')).resolves.not.toThrow()
+      await expect(
+        validator.validateUniqueNit('999999999'),
+      ).resolves.not.toThrow()
       expect(repository.findByNit).toHaveBeenCalledWith('999999999')
     })
 
@@ -86,9 +88,9 @@ describe('OrganizationValidator', () => {
       repository.findByNit.mockResolvedValue(mockOrganization)
 
       // Act & Assert
-      await expect(validator.validateUniqueNit('123456789', '2')).rejects.toThrow(
-        DuplicateOrganizationNitException,
-      )
+      await expect(
+        validator.validateUniqueNit('123456789', '2'),
+      ).rejects.toThrow(DuplicateOrganizationNitException)
     })
   })
 
@@ -109,7 +111,9 @@ describe('OrganizationValidator', () => {
       repository.findByName.mockResolvedValue(mockOrganization)
 
       // Act & Assert
-      await expect(validator.validateUniqueName('Test Organization')).rejects.toThrow(
+      await expect(
+        validator.validateUniqueName('Test Organization'),
+      ).rejects.toThrow(
         new DuplicateOrganizationNameException('Test Organization'),
       )
     })
@@ -178,7 +182,11 @@ describe('OrganizationValidator', () => {
 
       // Act & Assert
       await expect(
-        validator.validateUniqueConstraints('Test Organization', '123456789', '1'),
+        validator.validateUniqueConstraints(
+          'Test Organization',
+          '123456789',
+          '1',
+        ),
       ).resolves.not.toThrow()
     })
   })

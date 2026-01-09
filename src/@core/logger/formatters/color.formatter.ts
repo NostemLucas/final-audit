@@ -13,4 +13,7 @@ const colors = {
 
 winston.addColors(colors)
 
-export const colorFormatter = winston.format.colorize({ level: true, message: false })
+export const colorFormatter = winston.format.colorize({
+  level: true,
+  message: false,
+})

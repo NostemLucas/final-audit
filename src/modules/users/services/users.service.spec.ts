@@ -3,11 +3,18 @@ import { UserValidator } from '../validators/user.validator'
 import { UserFactory } from '../factories/user.factory'
 import { UserStatus, Role } from '../entities/user.entity'
 import { CreateUserDto, UpdateUserDto } from '../dtos'
-import { UserNotFoundException, EmailAlreadyExistsException } from '../exceptions'
+import {
+  UserNotFoundException,
+  EmailAlreadyExistsException,
+} from '../exceptions'
 import { FilesService } from '@core/files'
 import { TransactionService } from '@core/database'
 import { FakeUsersRepository } from '../__tests__/fixtures/fake-users.repository'
-import { TEST_USERS, UserBuilder, createTestUser } from '../__tests__/fixtures/user.fixtures'
+import {
+  TEST_USERS,
+  UserBuilder,
+  createTestUser,
+} from '../__tests__/fixtures/user.fixtures'
 import * as bcrypt from 'bcrypt'
 
 /**
@@ -211,7 +218,11 @@ describe('UsersService (Integration)', () => {
   describe('findByEmail', () => {
     it('should find user by email', async () => {
       // Arrange
-      fakeRepository.seed([TEST_USERS.ADMIN, TEST_USERS.AUDITOR, TEST_USERS.USUARIO])
+      fakeRepository.seed([
+        TEST_USERS.ADMIN,
+        TEST_USERS.AUDITOR,
+        TEST_USERS.USUARIO,
+      ])
 
       // Act
       const result = await service.findByEmail(TEST_USERS.AUDITOR.email)
@@ -356,7 +367,9 @@ describe('UsersService (Integration)', () => {
 
       // ✅ Verify with factory
       expect(factory.verifyPassword(plainPassword, saved!.password)).toBe(true)
-      expect(factory.verifyPassword('WrongPassword', saved!.password)).toBe(false)
+      expect(factory.verifyPassword('WrongPassword', saved!.password)).toBe(
+        false,
+      )
     })
   })
 })

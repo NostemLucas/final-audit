@@ -98,11 +98,7 @@ export class FakeUsersRepository implements IUsersRepository {
 
   async existsByEmail(email: string, excludeId?: string): Promise<boolean> {
     for (const user of this.users.values()) {
-      if (
-        user.email === email &&
-        user.id !== excludeId &&
-        !user.deletedAt
-      ) {
+      if (user.email === email && user.id !== excludeId && !user.deletedAt) {
         return true
       }
     }

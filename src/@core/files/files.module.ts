@@ -13,7 +13,7 @@ import { LocalStorageService } from './services/local-storage.service'
     MulterModule.register({
       storage: memoryStorage(),
       limits: {
-        fileSize: 20 * 1024 * 1024, // 20MB 
+        fileSize: 20 * 1024 * 1024, // 20MB
       },
     }),
   ],

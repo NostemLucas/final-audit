@@ -1,341 +1,441 @@
-# Testing de Repositorios
+# Estrategia de Testing para Repositorios
 
-Guía para probar `BaseRepository` y repositorios hijos correctamente.
+## Principio Fundamental
 
-## 🎯 Estrategia de Testing
+**Solo probamos NUESTRA lógica, NO la de TypeORM**
 
-### 1. **BaseRepository** - Probar UNA VEZ
-- Crear un test con una entidad dummy
-- Probar TODA la lógica genérica (save, findById, update, etc.)
-- Probar integración con CLS
+TypeORM ya está probado extensivamente por su equipo. No tiene sentido duplicar esos tests.
 
-### 2. **Repositorios Hijos** - Solo lógica personalizada
-- **NO** probar métodos heredados (save, findById, etc.)
-- **SÍ** probar solo métodos personalizados que agregaste
-- Mockear las llamadas del BaseRepository
+## BaseRepository: ¿Qué probar?
 
-### 3. **Tests de Integración** (Opcional)
-- Probar con base de datos real o en memoria
-- Verificar transacciones funcionan correctamente
+### ✅ SÍ Probar
 
-## 📁 Estructura de Tests
+**1. Lógica de conmutación de repositorio (`getRepo()`)**
 
-```
-src/@core/
-├── repositories/
-│   ├── base.repository.ts
-│   ├── base.repository.spec.ts        ← Prueba BaseRepository UNA VEZ
-│   └── base-repository.interface.ts
-└── examples/
-    ├── user.repository.ts
-    └── user.repository.spec.ts        ← Solo métodos personalizados
-```
+Esta es NUESTRA lógica personalizada que maneja las transacciones con CLS:
 
-## ✅ BaseRepository Test
-
-**¿Qué probar?**
-- ✅ `getRepo()` obtiene repository correcto (default vs CLS)
-- ✅ Métodos CRUD básicos (save, findById, update, etc.)
-- ✅ Integración con CLS (usa EntityManager de transacción)
-- ✅ Soft delete y recovery
-
-**Ejemplo:**
 ```typescript
-describe('BaseRepository', () => {
-  // Crear entidad dummy para testing
-  @Entity('test_entities')
-  class TestEntity extends BaseEntity {
-    @Column()
-    name: string
+protected getRepo(): Repository<T> {
+  const contextEntityManager = this.cls.get<EntityManager>(ENTITY_MANAGER_KEY)
+
+  if (
+    contextEntityManager &&
+    typeof contextEntityManager.getRepository === 'function'
+  ) {
+    return contextEntityManager.getRepository(this.repository.target)
   }
 
-  class TestRepository extends BaseRepository<TestEntity> {}
+  return this.repository
+}
+```
 
-  it('should save entity using default repository', async () => {
-    const data = { name: 'Test' }
-    mockClsService.get.mockReturnValue(undefined) // Sin transacción
+**Tests necesarios:**
 
-    const result = await testRepository.save(data)
+- ✅ **Escenario A**: Sin EntityManager en CLS → usa repositorio por defecto
+- ✅ **Escenario B**: Con EntityManager en CLS → usa repositorio transaccional
+- ✅ **Edge Cases**: CLS devuelve valores inválidos → fallback a repositorio por defecto
+- ✅ **Integración**: Conmutación consistente entre múltiples llamadas
+- ✅ **Compatibilidad**: Verificar que `@Transactional` funciona correctamente
 
+### ❌ NO Probar
+
+**Métodos que solo delegan a TypeORM:**
+
+```typescript
+// ❌ NO probar esto - es código de TypeORM
+async findById(id: string): Promise<T | null> {
+  return await this.getRepo().findOne({ where: { id } })
+}
+
+// ❌ NO probar esto - es código de TypeORM
+async save(data: DeepPartial<T>): Promise<T> {
+  const createdEntity = this.create(data)
+  return await this.getRepo().save(createdEntity)
+}
+
+// ❌ NO probar esto - es código de TypeORM
+async update(id: string, partialEntity: QueryDeepPartialEntity<T>): Promise<boolean> {
+  const result = await this.getRepo().update(id, partialEntity)
+  return (result.affected ?? 0) > 0
+}
+```
+
+**¿Por qué no?**
+- Son simples wrappers de TypeORM
+- TypeORM ya garantiza que `findOne()`, `save()`, `update()` funcionan
+- Nuestros tests solo verificarían que TypeORM funciona (redundante)
+
+## Repositorios Específicos: ¿Qué probar?
+
+Para repositorios que extienden `BaseRepository` (ej: `OrganizationRepository`, `UserRepository`):
+
+### ✅ SÍ Probar
+
+**1. Métodos con lógica SQL personalizada**
+
+```typescript
+// ✅ PROBAR - QueryBuilder complejo con join
+async countActiveUsers(organizationId: string): Promise<number> {
+  return await this.getRepo()
+    .createQueryBuilder('org')
+    .leftJoin('org.users', 'user')
+    .where('org.id = :id', { id: organizationId })
+    .andWhere('user.isActive = :isActive', { isActive: true })
+    .getCount()
+}
+
+// ✅ PROBAR - Búsqueda con múltiples condiciones OR
+async findWithFilters(filters: OrganizationFilters): Promise<[OrganizationEntity[], number]> {
+  const queryBuilder = this.getRepo()
+    .createQueryBuilder('org')
+    .where('(org.name ILIKE :search OR org.nit ILIKE :search)', { search })
+
+  // ... más lógica compleja
+  return await queryBuilder.getManyAndCount()
+}
+```
+
+**¿Por qué?**
+- Es NUESTRA lógica de negocio
+- Puede tener bugs en las condiciones WHERE, joins, etc.
+- Es fácil equivocarse con QueryBuilder
+
+**Cómo probarlo:**
+- Usa SQLite in-memory para tests de repositorio
+- Ejecuta el QueryBuilder real y verifica resultados
+- Ver: `src/@core/testing/test-database.helper.ts`
+
+### ❌ NO Probar
+
+**1. Métodos simples que usan métodos genéricos**
+
+```typescript
+// ❌ NO NECESARIO - usa findOne genérico
+async findByNit(nit: string): Promise<OrganizationEntity | null> {
+  return await this.findOne({ nit })
+}
+
+// ❌ NO NECESARIO - usa findOne genérico
+async findByEmail(email: string): Promise<UserEntity | null> {
+  return await this.findOne({ email })
+}
+
+// ❌ NO NECESARIO - usa count genérico
+async countByOrganization(orgId: string): Promise<number> {
+  return await this.count({ organizationId: orgId })
+}
+```
+
+**¿Por qué no?**
+- Solo delegan a métodos genéricos del `BaseRepository`
+- La lógica de `findOne()` ya está probada por TypeORM
+- El tipo de safety de TypeScript garantiza que los parámetros son correctos
+
+**MEJOR OPCIÓN**: Eliminar estos métodos y usar directamente los genéricos:
+
+```typescript
+// En lugar de repository.findByNit(nit)
+await repository.findOne({ nit })
+
+// En lugar de repository.findByEmail(email)
+await repository.findOne({ email })
+```
+
+## Estructura de Tests Recomendada
+
+### BaseRepository Tests (14 tests - ~1 segundo)
+
+```
+base.repository.spec.ts
+├── Escenario A: Sin transacción (4 tests)
+│   ├── CLS devuelve undefined
+│   ├── CLS devuelve null
+│   ├── Método sincrónico (create)
+│   └── Método asíncrono (findById)
+├── Escenario B: Con transacción (3 tests)
+│   ├── CLS tiene EntityManager
+│   ├── Método sincrónico (create)
+│   └── Método asíncrono (save)
+├── Edge Cases (3 tests)
+│   ├── CLS devuelve objeto sin getRepository
+│   ├── getRepository no es función
+│   └── CLS devuelve objeto vacío
+├── Integración (3 tests)
+│   ├── Uso consistente en múltiples llamadas
+│   ├── Conmutación correcta entre repos
+│   └── CLS.get llamado en cada invocación
+└── Verificación (1 test)
+    └── Compatibilidad con @Transactional
+```
+
+### Repositorio Específico Tests (SQLite in-memory)
+
+**SOLO para métodos con QueryBuilder o lógica compleja**
+
+```
+organization.repository.spec.ts
+└── Métodos complejos
+    ├── countActiveUsers() - QueryBuilder con join
+    └── findWithFilters() - Búsqueda con OR conditions
+
+user.repository.spec.ts
+└── Métodos complejos
+    ├── findUsersWithPermissions() - Múltiples joins
+    └── aggregateUserStats() - Agregaciones complejas
+```
+
+## Comparación: Antes vs Después
+
+### ❌ Antes (Excesivo)
+
+```typescript
+describe('findById()', () => {
+  it('should find entity by id', async () => {
+    // Probando TypeORM, no nuestra lógica
+    const result = await repository.findById('123')
+    expect(mockRepository.findOne).toHaveBeenCalled()
+  })
+})
+
+describe('save()', () => {
+  it('should save entity', async () => {
+    // Probando TypeORM, no nuestra lógica
+    const result = await repository.save(data)
     expect(mockRepository.save).toHaveBeenCalled()
   })
+})
 
-  it('should use transaction repository when in CLS', async () => {
+// ... 30 tests más para cada método CRUD
+```
+
+**Problemas:**
+- 40+ tests que solo verifican que TypeORM funciona
+- Mantenimiento innecesario
+- Tiempo de ejecución desperdiciado
+
+### ✅ Después (Eficiente)
+
+```typescript
+describe('Escenario A: Sin transacción', () => {
+  it('debe usar repositorio por defecto cuando CLS devuelve undefined', () => {
+    // Probando NUESTRA lógica de conmutación
+    const repo = testRepository.getRepoPublic()
+    expect(repo).toBe(mockRepository)
+  })
+
+  it('debe usar repositorio por defecto en método real (create)', () => {
+    // Verificamos que la conmutación funciona en métodos reales
+    testRepository.create(data)
+    expect(mockRepository.create).toHaveBeenCalled()
+    expect(mockTransactionRepository.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('Escenario B: Con transacción', () => {
+  it('debe usar repositorio transaccional cuando CLS tiene EntityManager', () => {
+    // Probando NUESTRA lógica de conmutación
+    const repo = testRepository.getRepoPublic()
+    expect(repo).toBe(mockTransactionRepository)
+  })
+})
+```
+
+**Beneficios:**
+- 14 tests enfocados en nuestra lógica
+- Rápidos de ejecutar (<1 segundo)
+- Fáciles de mantener
+- Si fallan, sabemos que hay un bug REAL
+
+## Ejemplo: BaseRepository Test
+
+```typescript
+import { Repository, EntityManager, Entity, Column } from 'typeorm'
+import { ClsService } from 'nestjs-cls'
+import { BaseRepository } from './base.repository'
+import { BaseEntity } from '@core/entities'
+import { ENTITY_MANAGER_KEY } from '@core/database'
+
+// Entidad dummy para testing
+@Entity('test_entities')
+class TestEntity extends BaseEntity {
+  @Column()
+  name: string
+}
+
+// Repository con método público para testing
+class TestRepository extends BaseRepository<TestEntity> {
+  constructor(repository: Repository<TestEntity>, cls: ClsService) {
+    super(repository, cls)
+  }
+
+  // Exponemos getRepo para probar directamente
+  public getRepoPublic(): Repository<TestEntity> {
+    return this.getRepo()
+  }
+}
+
+describe('BaseRepository - CLS Transaction Switching', () => {
+  let mockRepository: any
+  let mockClsService: any
+  let mockEntityManager: any
+  let mockTransactionRepository: any
+
+  beforeEach(() => {
+    mockRepository = {
+      create: jest.fn(),
+      save: jest.fn(),
+      findOne: jest.fn(),
+      // ... solo los métodos que usaremos
+    }
+
+    mockTransactionRepository = {
+      create: jest.fn(),
+      save: jest.fn(),
+      findOne: jest.fn(),
+    }
+
+    mockEntityManager = {
+      getRepository: jest.fn().mockReturnValue(mockTransactionRepository),
+    }
+
+    mockClsService = {
+      get: jest.fn().mockReturnValue(undefined),
+    }
+
+    testRepository = new TestRepository(mockRepository, mockClsService)
+  })
+
+  it('debe usar repositorio por defecto cuando CLS devuelve undefined', () => {
+    mockClsService.get.mockReturnValue(undefined)
+
+    const repo = testRepository.getRepoPublic()
+
+    expect(mockClsService.get).toHaveBeenCalledWith(ENTITY_MANAGER_KEY)
+    expect(repo).toBe(mockRepository)
+  })
+
+  it('debe usar repositorio transaccional cuando CLS tiene EntityManager', () => {
     mockClsService.get.mockReturnValue(mockEntityManager)
 
-    await testRepository.save(data)
+    const repo = testRepository.getRepoPublic()
 
-    expect(mockEntityManager.getRepository).toHaveBeenCalled()
+    expect(mockEntityManager.getRepository).toHaveBeenCalledWith(TestEntity)
+    expect(repo).toBe(mockTransactionRepository)
   })
 })
 ```
 
-Ver archivo completo: `base.repository.spec.ts`
-
-## ✅ Repository Hijo Test
-
-**¿Qué probar?**
-- ✅ **SOLO** métodos personalizados que agregaste
-- ❌ **NO** probar save(), findById(), update() (ya están en BaseRepository)
-
-**Ejemplo - UserRepository:**
+## Ejemplo: Repository Específico Test
 
 ```typescript
-describe('UserRepository', () => {
-  // ⚠️ IMPORTANTE: Solo probamos métodos personalizados
+import { createInMemoryDataSource } from '@core/testing'
+import { OrganizationRepository } from './organization.repository'
+import { OrganizationEntity } from '../entities/organization.entity'
+import { UserEntity } from '../entities/user.entity'
 
-  describe('findByEmail() - método personalizado', () => {
-    it('should find user by email', async () => {
-      const user = { id: '1', email: 'test@test.com' }
-      mockRepository.findOne.mockResolvedValue(user)
-
-      const result = await userRepository.findByEmail('test@test.com')
-
-      expect(result).toBe(user)
-    })
-  })
-
-  describe('findActiveUsers() - método personalizado', () => {
-    it('should find only active users', async () => {
-      mockQueryBuilder.getMany.mockResolvedValue([...users])
-
-      const result = await userRepository.findActiveUsers()
-
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'user.deletedAt IS NULL'
-      )
-    })
-  })
-
-  // ❌ NO HACER ESTO:
-  // describe('save()', () => { ... })  ← Ya está probado en BaseRepository
-  // describe('findById()', () => { ... })  ← Ya está probado en BaseRepository
-})
-```
-
-Ver archivo completo: `user.repository.spec.ts`
-
-## 🔧 Setup de Tests
-
-### Mocks Necesarios
-
-```typescript
-let mockRepository: jest.Mocked<Repository<User>>
-let mockClsService: jest.Mocked<ClsService>
-let mockEntityManager: jest.Mocked<EntityManager>
-
-beforeEach(() => {
-  mockRepository = {
-    findOne: jest.fn(),
-    save: jest.fn(),
-    update: jest.fn(),
-    // ... otros métodos que uses
-  } as any
-
-  mockClsService = {
-    get: jest.fn().mockReturnValue(undefined), // Sin transacción por defecto
-  } as any
-
-  mockEntityManager = {
-    getRepository: jest.fn().mockReturnValue(mockRepository),
-  } as any
-})
-```
-
-### Simular Transacción Activa
-
-```typescript
-it('should use transaction when CLS has EntityManager', async () => {
-  // Simular que hay una transacción activa
-  mockClsService.get.mockReturnValue(mockEntityManager)
-
-  await userRepository.findByEmail('test@test.com')
-
-  // Verificar que se usó el EntityManager de CLS
-  expect(mockEntityManager.getRepository).toHaveBeenCalledWith(User)
-})
-```
-
-## 🧪 Ejecutar Tests
-
-```bash
-# Todos los tests
-npm test
-
-# Solo tests de repositorios
-npm test -- repositories
-
-# Con coverage
-npm test -- --coverage
-
-# Watch mode
-npm test -- --watch
-```
-
-## 📊 Coverage Esperado
-
-### BaseRepository
-- ✅ **100%** de coverage en lógica CRUD
-- ✅ Todas las ramas de `getRepo()` cubiertas
-
-### Repositorios Hijos
-- ✅ **100%** de coverage en métodos personalizados
-- ⚠️ Métodos heredados NO cuentan para coverage (ya están en BaseRepository)
-
-## 🎭 Tipos de Tests
-
-### 1. Tests Unitarios (Recomendado)
-
-**BaseRepository:**
-```typescript
-// Mockear todo, probar lógica aislada
-it('should save entity', async () => {
-  mockRepository.save.mockResolvedValue(savedEntity)
-
-  const result = await repository.save(data)
-
-  expect(result).toBe(savedEntity)
-})
-```
-
-**Repository Hijo:**
-```typescript
-// Solo probar métodos personalizados
-it('should find by email', async () => {
-  mockRepository.findOne.mockResolvedValue(user)
-
-  const result = await userRepository.findByEmail(email)
-
-  expect(result).toBe(user)
-})
-```
-
-### 2. Tests de Integración (Opcional)
-
-Usar base de datos en memoria (SQLite):
-
-```typescript
-describe('UserRepository Integration', () => {
+describe('OrganizationRepository (SQLite In-Memory)', () => {
+  let repository: OrganizationRepository
   let dataSource: DataSource
-  let userRepository: UserRepository
 
   beforeAll(async () => {
-    dataSource = await new DataSource({
-      type: 'sqlite',
-      database: ':memory:',
-      entities: [User],
-      synchronize: true,
-    }).initialize()
+    dataSource = await createInMemoryDataSource([
+      OrganizationEntity,
+      UserEntity,
+    ])
 
-    const repository = dataSource.getRepository(User)
+    const typeormRepo = dataSource.getRepository(OrganizationEntity)
     const clsService = new ClsService()
-    userRepository = new UserRepository(repository, clsService)
+    repository = new OrganizationRepository(typeormRepo, clsService)
   })
 
-  it('should save and find user', async () => {
-    const user = await userRepository.save({
-      email: 'test@test.com',
-      name: 'Test'
+  afterAll(async () => {
+    await dataSource.destroy()
+  })
+
+  // ✅ Solo probar métodos con QueryBuilder complejo
+  describe('countActiveUsers()', () => {
+    it('should count only active users with QueryBuilder', async () => {
+      // Arrange
+      const org = await repository.save({
+        name: 'Test Org',
+        nit: '123456',
+      })
+
+      await dataSource.getRepository(UserEntity).save([
+        { name: 'User 1', organizationId: org.id, isActive: true },
+        { name: 'User 2', organizationId: org.id, isActive: true },
+        { name: 'User 3', organizationId: org.id, isActive: false }, // Inactivo
+      ])
+
+      // Act
+      const count = await repository.countActiveUsers(org.id)
+
+      // Assert
+      expect(count).toBe(2) // Solo los 2 activos
     })
-
-    const found = await userRepository.findByEmail('test@test.com')
-
-    expect(found?.id).toBe(user.id)
   })
+
+  // ❌ NO probar esto:
+  // describe('findById()', () => {}) - Ya está en BaseRepository
+  // describe('save()', () => {}) - Ya está en BaseRepository
 })
 ```
 
-## 📝 Best Practices
+## Regla de Oro
 
-### ✅ DO
+> **"Si el método solo llama a TypeORM sin lógica adicional, NO lo pruebes"**
+
+**Ejemplos:**
 
 ```typescript
-// 1. Probar BaseRepository con entidad dummy
-class TestEntity extends BaseEntity {}
-class TestRepository extends BaseRepository<TestEntity> {}
+// ❌ NO probar - solo llama a TypeORM
+async findById(id: string) {
+  return await this.getRepo().findOne({ where: { id } })
+}
 
-// 2. En repos hijos, solo probar métodos personalizados
-describe('findByEmail()', () => {
-  // Test específico de UserRepository
-})
-
-// 3. Mockear correctamente las dependencias
-mockClsService.get.mockReturnValue(undefined)
-
-// 4. Limpiar mocks después de cada test
-afterEach(() => {
-  jest.clearAllMocks()
-})
+// ✅ SÍ probar - lógica de negocio compleja
+async findActiveUsersWithRoles(orgId: string) {
+  return await this.getRepo()
+    .createQueryBuilder('user')
+    .leftJoinAndSelect('user.roles', 'role')
+    .where('user.organizationId = :orgId', { orgId })
+    .andWhere('user.isActive = :active', { active: true })
+    .andWhere('role.isActive = :active', { active: true })
+    .getMany()
+}
 ```
 
-### ❌ DON'T
+## Ejecutar Tests
 
-```typescript
-// 1. NO probar métodos heredados en repos hijos
-describe('UserRepository', () => {
-  describe('save()', () => {}) // ❌ Ya está en BaseRepository
-  describe('findById()', () => {}) // ❌ Ya está en BaseRepository
-})
+```bash
+# BaseRepository tests (unitarios, rápidos)
+npm test -- base.repository.spec
 
-// 2. NO duplicar tests de BaseRepository
-// Si ya está probado en base.repository.spec.ts, no lo pruebes otra vez
+# Repository tests (con SQLite in-memory)
+npm run test:repository
 
-// 3. NO olvidar limpiar mocks
-// Puede causar tests que pasan pero no deberían
+# Todos los tests unitarios
+npm run test:unit
+
+# Todos los tests
+npm test
 ```
 
-## 🔍 Debugging Tests
+## Beneficios de esta Estrategia
 
-### Ver qué se está llamando
+1. **Menos código de test** - Solo 14 tests para BaseRepository vs 40+ anteriormente
+2. **Tests más rápidos** - No ejecutamos operaciones de DB innecesarias
+3. **Mayor mantenibilidad** - Si TypeORM cambia, solo actualizamos el código, no los tests
+4. **Enfoque en lo importante** - Probamos nuestra lógica, no la de terceros
+5. **Mejor señal de fallos** - Si un test falla, es porque HAY un bug en nuestro código
 
-```typescript
-it('should call correct methods', async () => {
-  await userRepository.findByEmail('test@test.com')
+## Conclusión
 
-  // Ver TODAS las llamadas
-  console.log(mockRepository.findOne.mock.calls)
+Esta estrategia de testing:
+- ✅ Prueba el 100% de NUESTRA lógica personalizada
+- ✅ Confía en que TypeORM funciona (porque está bien probado)
+- ✅ Reduce drásticamente el código de test
+- ✅ Mejora el mantenimiento
+- ✅ Acelera la ejecución de tests
 
-  // Ver argumentos de la primera llamada
-  console.log(mockRepository.findOne.mock.calls[0])
-})
-```
-
-### Ver valores de retorno
-
-```typescript
-it('should return mocked value', async () => {
-  const mockUser = { id: '1', email: 'test@test.com' }
-  mockRepository.findOne.mockResolvedValue(mockUser)
-
-  const result = await userRepository.findByEmail('test@test.com')
-
-  console.log('Result:', result)
-  console.log('Mock was called:', mockRepository.findOne.mock.calls.length)
-})
-```
-
-## 📚 Recursos
-
-- Jest Documentation: https://jestjs.io/docs/getting-started
-- NestJS Testing: https://docs.nestjs.com/fundamentals/testing
-- TypeORM Testing: https://typeorm.io/testing
-
-## 🎯 Checklist
-
-Antes de hacer commit, verifica:
-
-- [ ] BaseRepository tiene tests completos
-- [ ] Repos hijos solo prueban métodos personalizados
-- [ ] Todos los tests pasan (`npm test`)
-- [ ] Coverage es >80% (`npm test -- --coverage`)
-- [ ] No hay tests duplicados
-- [ ] Mocks se limpian correctamente
-- [ ] Tests son rápidos (<1s cada uno)
-
-## 💡 Tips
-
-1. **Usa `describe()` por método** - Facilita encontrar qué test falló
-2. **Nombres descriptivos** - `should find user by email when user exists`
-3. **Arrange-Act-Assert** - Estructura clara en cada test
-4. **Mock solo lo necesario** - No mockear todo si no lo usas
-5. **Tests rápidos** - Si un test tarda >1s, probablemente necesita optimización
+**Resultado:** Tests más valiosos, menos trabajo, mejor confianza.

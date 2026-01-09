@@ -1,6 +1,10 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { OrganizationEntity } from '../entities/organization.entity'
-import { CreateOrganizationDto, UpdateOrganizationDto } from '../dtos'
+import {
+  CreateOrganizationDto,
+  UpdateOrganizationDto,
+  FindOrganizationsDto,
+} from '../dtos'
 import type { IOrganizationRepository } from '../repositories'
 import { ORGANIZATION_REPOSITORY } from '../repositories'
 import { OrganizationValidator } from '../validators/organization.validator'
@@ -10,6 +14,7 @@ import {
   OrganizationHasActiveUsersException,
 } from '../exceptions'
 import { FilesService, FileType } from '@core/files'
+import { PaginatedResponse, PaginatedResponseBuilder } from '@core/dtos'
 
 @Injectable()
 export class OrganizationsService {
@@ -39,6 +44,72 @@ export class OrganizationsService {
 
   async findAll(): Promise<OrganizationEntity[]> {
     return await this.organizationRepository.findAllActive()
+  }
+
+  /**
+   * Busca organizaciones con paginación y filtros personalizados
+   *
+   * @param query - DTO con parámetros de paginación y filtros
+   * @returns Respuesta paginada con organizaciones
+   *
+   * @example
+   * ```typescript
+   * // Todas las organizaciones
+   * await service.findWithFilters({ all: true })
+   *
+   * // Primera página con 10 registros
+   * await service.findWithFilters({ page: 1, limit: 10 })
+   *
+   * // Buscar por texto
+   * await service.findWithFilters({ search: 'coca', page: 1, limit: 10 })
+   *
+   * // Solo activas con logo
+   * await service.findWithFilters({ isActive: true, hasLogo: true, all: true })
+   * ```
+   */
+  async findWithFilters(
+    query: FindOrganizationsDto,
+  ): Promise<PaginatedResponse<OrganizationEntity>> {
+    const {
+      page = 1,
+      limit = 10,
+      all = false,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      search,
+      isActive,
+      hasLogo,
+    } = query
+
+    // Construir filtros
+    const filters = {
+      search,
+      isActive,
+      hasLogo,
+    }
+
+    // Si all=true, devolver todos los registros
+    if (all) {
+      const [data] = await this.organizationRepository.findWithFilters(
+        filters,
+        undefined,
+        undefined,
+        sortBy,
+        sortOrder,
+      )
+      return PaginatedResponseBuilder.createAll(data)
+    }
+
+    // Paginación normal
+    const [data, total] = await this.organizationRepository.findWithFilters(
+      filters,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    )
+
+    return PaginatedResponseBuilder.create(data, total, page, limit)
   }
 
   async findOne(id: string): Promise<OrganizationEntity> {

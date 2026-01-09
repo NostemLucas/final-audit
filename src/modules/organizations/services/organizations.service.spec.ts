@@ -183,14 +183,19 @@ describe('OrganizationsService (Integration)', () => {
       }
 
       // Act
-      const result = await service.update(TEST_ORGANIZATIONS.ORG_1.id, updateDto)
+      const result = await service.update(
+        TEST_ORGANIZATIONS.ORG_1.id,
+        updateDto,
+      )
 
       // Assert
       expect(result.name).toBe('Empresa Actualizada') // Factory normalized
       expect(result.description).toBe('Descripción actualizada')
 
       // ✅ Verify change persisted in repo
-      const updatedOrg = await fakeRepository.findById(TEST_ORGANIZATIONS.ORG_1.id)
+      const updatedOrg = await fakeRepository.findById(
+        TEST_ORGANIZATIONS.ORG_1.id,
+      )
       expect(updatedOrg!.name).toBe('Empresa Actualizada')
       expect(updatedOrg!.description).toBe('Descripción actualizada')
     })
@@ -205,7 +210,10 @@ describe('OrganizationsService (Integration)', () => {
       }
 
       // Act
-      const result = await service.update(TEST_ORGANIZATIONS.ORG_1.id, updateDto)
+      const result = await service.update(
+        TEST_ORGANIZATIONS.ORG_1.id,
+        updateDto,
+      )
 
       // Assert - ✅ Validator REAL allows updating with same name
       expect(result.name).toBe('Empresa De Auditoría Principal')
@@ -243,7 +251,9 @@ describe('OrganizationsService (Integration)', () => {
       expect(result).toHaveLength(2) // ORG_1 and ORG_2 (active)
       expect(result.map((o) => o.id)).toContain(TEST_ORGANIZATIONS.ORG_1.id)
       expect(result.map((o) => o.id)).toContain(TEST_ORGANIZATIONS.ORG_2.id)
-      expect(result.map((o) => o.id)).not.toContain(TEST_ORGANIZATIONS.INACTIVE_ORG.id)
+      expect(result.map((o) => o.id)).not.toContain(
+        TEST_ORGANIZATIONS.INACTIVE_ORG.id,
+      )
     })
 
     it('should return empty array when no organizations exist', async () => {

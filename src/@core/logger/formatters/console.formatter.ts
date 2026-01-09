@@ -124,7 +124,8 @@ export const consoleFormatter = winston.format.printf((info) => {
 
   // Obtener nivel sin colores ANSI
   const cleanLevel = (level ?? '').replace(/\u001b\[\d+m/g, '').toLowerCase()
-  const colorFn = LOG_COLORS[cleanLevel as keyof typeof LOG_COLORS] || chalk.white
+  const colorFn =
+    LOG_COLORS[cleanLevel as keyof typeof LOG_COLORS] || chalk.white
   const symbol = LOG_SYMBOLS[cleanLevel as keyof typeof LOG_SYMBOLS] || '•'
 
   // Timestamp en gris
@@ -160,19 +161,27 @@ export const consoleFormatter = winston.format.printf((info) => {
     const reqData: string[] = []
 
     if (request.method && request.url) {
-      reqData.push(`  │ ${chalk.bold('Endpoint')}: ${chalk.cyan(request.method)} ${chalk.cyan(request.url)}`)
+      reqData.push(
+        `  │ ${chalk.bold('Endpoint')}: ${chalk.cyan(request.method)} ${chalk.cyan(request.url)}`,
+      )
     }
     if (request.ip) {
       reqData.push(`  │ ${chalk.bold('IP')}: ${chalk.cyan(request.ip)}`)
     }
     if (request.contentType) {
-      reqData.push(`  │ ${chalk.bold('Content-Type')}: ${chalk.cyan(request.contentType)}`)
+      reqData.push(
+        `  │ ${chalk.bold('Content-Type')}: ${chalk.cyan(request.contentType)}`,
+      )
     }
     if (request.query && Object.keys(request.query).length > 0) {
-      reqData.push(`  │ ${chalk.bold('Query')}: ${formatJSON(request.query, 4)}`)
+      reqData.push(
+        `  │ ${chalk.bold('Query')}: ${formatJSON(request.query, 4)}`,
+      )
     }
     if (request.params && Object.keys(request.params).length > 0) {
-      reqData.push(`  │ ${chalk.bold('Params')}: ${formatJSON(request.params, 4)}`)
+      reqData.push(
+        `  │ ${chalk.bold('Params')}: ${formatJSON(request.params, 4)}`,
+      )
     }
     if (request.body && Object.keys(request.body).length > 0) {
       reqData.push(`  │ ${chalk.bold('Body')}: ${formatJSON(request.body, 4)}`)
@@ -195,11 +204,15 @@ export const consoleFormatter = winston.format.printf((info) => {
           : response.statusCode >= 400
             ? chalk.yellow
             : chalk.green
-      resData.push(`  │ ${chalk.bold('Status')}: ${statusColor(response.statusCode)}`)
+      resData.push(
+        `  │ ${chalk.bold('Status')}: ${statusColor(response.statusCode)}`,
+      )
     }
     if (response.responseTime !== undefined) {
       const timeColor = response.responseTime > 1000 ? chalk.red : chalk.green
-      resData.push(`  │ ${chalk.bold('Time')}: ${timeColor(response.responseTime + 'ms')}`)
+      resData.push(
+        `  │ ${chalk.bold('Time')}: ${timeColor(response.responseTime + 'ms')}`,
+      )
     }
 
     if (resData.length > 0) {
@@ -212,9 +225,16 @@ export const consoleFormatter = winston.format.printf((info) => {
     const deviceTitle = colorFn('\n  ┌─ Device:')
     const deviceData: string[] = []
 
-    if (device.browser) deviceData.push(`  │ ${chalk.bold('Browser')}: ${chalk.cyan(device.browser)}`)
-    if (device.os) deviceData.push(`  │ ${chalk.bold('OS')}: ${chalk.cyan(device.os)}`)
-    if (device.device) deviceData.push(`  │ ${chalk.bold('Device')}: ${chalk.cyan(device.device)}`)
+    if (device.browser)
+      deviceData.push(
+        `  │ ${chalk.bold('Browser')}: ${chalk.cyan(device.browser)}`,
+      )
+    if (device.os)
+      deviceData.push(`  │ ${chalk.bold('OS')}: ${chalk.cyan(device.os)}`)
+    if (device.device)
+      deviceData.push(
+        `  │ ${chalk.bold('Device')}: ${chalk.cyan(device.device)}`,
+      )
 
     if (deviceData.length > 0) {
       output += `${deviceTitle}\n${deviceData.join('\n')}\n${colorFn('  └─')}`
@@ -231,10 +251,16 @@ export const consoleFormatter = winston.format.printf((info) => {
     const errorTitle = chalk.red('\n  ┌─ Error Details:')
     const errorData: string[] = []
 
-    if (error.name) errorData.push(`  │ ${chalk.bold('Name')}: ${chalk.red(error.name)}`)
-    if (error.message) errorData.push(`  │ ${chalk.bold('Message')}: ${chalk.red(error.message)}`)
+    if (error.name)
+      errorData.push(`  │ ${chalk.bold('Name')}: ${chalk.red(error.name)}`)
+    if (error.message)
+      errorData.push(
+        `  │ ${chalk.bold('Message')}: ${chalk.red(error.message)}`,
+      )
     if (error.stack && typeof error.stack === 'string') {
-      const stackLines = error.stack.split('\n').map((line) => `  │   ${chalk.gray(line)}`)
+      const stackLines = error.stack
+        .split('\n')
+        .map((line) => `  │   ${chalk.gray(line)}`)
       errorData.push(`  │ ${chalk.bold('Stack')}:\n${stackLines.join('\n')}`)
     }
 
@@ -250,7 +276,9 @@ export const consoleFormatter = winston.format.printf((info) => {
       .map(([key, value]) => {
         const keyDisplay = chalk.bold(key)
         const valueDisplay =
-          typeof value === 'object' ? formatJSON(value, 4) : chalk.cyan(String(value))
+          typeof value === 'object'
+            ? formatJSON(value, 4)
+            : chalk.cyan(String(value))
         return `  │ ${keyDisplay}: ${valueDisplay}`
       })
       .join('\n')
@@ -279,7 +307,11 @@ export const consoleFormatter = winston.format.printf((info) => {
 
   const filteredMetadata = Object.keys(metadata).reduce(
     (acc, key) => {
-      if (!reservedKeys.some((reserved) => key === reserved || key === String(reserved))) {
+      if (
+        !reservedKeys.some(
+          (reserved) => key === reserved || key === String(reserved),
+        )
+      ) {
         acc[key] = metadata[key]
       }
       return acc

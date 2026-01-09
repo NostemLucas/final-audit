@@ -424,7 +424,10 @@ describe('UserFactory', () => {
 
       // Act
       const user = factory.createFromDto(dto)
-      const isValid = factory.verifyPassword('MyPlainPassword123!', user.password)
+      const isValid = factory.verifyPassword(
+        'MyPlainPassword123!',
+        user.password,
+      )
 
       // Assert
       expect(isValid).toBe(true)

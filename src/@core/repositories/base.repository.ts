@@ -2,6 +2,7 @@ import { BaseEntity } from '@core/entities'
 import {
   type DeepPartial,
   type FindManyOptions,
+  type FindOneOptions,
   type EntityManager,
   type FindOptionsWhere,
   type Repository,
@@ -11,6 +12,11 @@ import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialE
 import { IBaseRepository } from './base-repository.interface'
 import { ClsService } from 'nestjs-cls'
 import { ENTITY_MANAGER_KEY } from '@core/database'
+import {
+  PaginationDto,
+  PaginatedResponse,
+  PaginatedResponseBuilder,
+} from '@core/dtos'
 
 export abstract class BaseRepository<
   T extends BaseEntity,
@@ -75,20 +81,66 @@ export abstract class BaseRepository<
     } as FindManyOptions<T>)
   }
 
-  async findAll(): Promise<T[]> {
-    return await this.getRepo().find()
+  async findAll(options?: FindManyOptions<T>): Promise<T[]> {
+    return await this.getRepo().find(options)
   }
 
-  // ---------- Métodos de paginación ----------
-  /*   async paginate(options: PaginationDto): Promise<[T[], number]> {
-    const { limit, skip } = options
+  // Búsqueda genérica
+  async findOne(
+    where: FindOptionsWhere<T>,
+    options?: FindOneOptions<T>,
+  ): Promise<T | null> {
+    return await this.getRepo().findOne({
+      where,
+      ...options,
+    })
+  }
+
+  async findWhere(
+    where: FindOptionsWhere<T>,
+    options?: FindManyOptions<T>,
+  ): Promise<T[]> {
+    return await this.getRepo().find({
+      where,
+      ...options,
+    })
+  }
+
+  async count(where?: FindOptionsWhere<T>): Promise<number> {
+    return await this.getRepo().count({ where })
+  }
+
+  async exists(where: FindOptionsWhere<T>): Promise<boolean> {
+    const count = await this.count(where)
+    return count > 0
+  }
+
+  async paginate(query: PaginationDto): Promise<PaginatedResponse<T>> {
+    const { page = 1, limit = 10, all = false, sortBy, sortOrder } = query
+
+    // Si all=true, devolver todos los registros con estructura estándar
+    if (all) {
+      const allRecords = await this.findAll({
+        order: sortBy ? { [sortBy]: sortOrder || 'DESC' } : undefined,
+      } as FindManyOptions<T>)
+
+      return PaginatedResponseBuilder.createAll(allRecords)
+    }
+
+    // Paginación normal
+    const skip = (page - 1) * limit
+
     const findOptions: FindManyOptions<T> = {
       take: limit,
-      skip: skip,
-    }
-    return this.getRepo().findAndCount(findOptions)
+      skip,
+      order: sortBy ? { [sortBy]: sortOrder || 'DESC' } : undefined,
+    } as FindManyOptions<T>
+
+    const [data, total] = await this.getRepo().findAndCount(findOptions)
+
+    return PaginatedResponseBuilder.create(data, total, page, limit)
   }
- */
+
   // ---------- Métodos de actualización ----------
   async update(
     id: string,

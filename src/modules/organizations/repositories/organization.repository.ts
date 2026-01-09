@@ -65,4 +65,56 @@ export class OrganizationRepository
   async hardDelete(id: string): Promise<void> {
     await this.getRepo().delete(id)
   }
+
+  /**
+   * Busca organizaciones con filtros personalizados
+   * Retorna tupla con [data, total]
+   */
+  async findWithFilters(
+    filters: import('./organization-repository.interface').OrganizationFilters,
+    page?: number,
+    limit?: number,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ): Promise<[OrganizationEntity[], number]> {
+    const queryBuilder = this.getRepo()
+      .createQueryBuilder('org')
+      .leftJoinAndSelect('org.users', 'users')
+
+    // Filtro de búsqueda de texto
+    if (filters.search) {
+      const searchTerm = `%${filters.search}%`
+      queryBuilder.andWhere(
+        '(org.name ILIKE :search OR org.nit ILIKE :search OR org.description ILIKE :search OR org.email ILIKE :search)',
+        { search: searchTerm },
+      )
+    }
+
+    // Filtro por estado activo
+    if (filters.isActive !== undefined) {
+      queryBuilder.andWhere('org.isActive = :isActive', {
+        isActive: filters.isActive,
+      })
+    }
+
+    // Filtro por logo
+    if (filters.hasLogo !== undefined) {
+      if (filters.hasLogo) {
+        queryBuilder.andWhere('org.logoUrl IS NOT NULL')
+      } else {
+        queryBuilder.andWhere('org.logoUrl IS NULL')
+      }
+    }
+
+    // Ordenamiento
+    queryBuilder.orderBy(`org.${sortBy}`, sortOrder)
+
+    // Paginación (si se proporciona)
+    if (page !== undefined && limit !== undefined) {
+      const skip = (page - 1) * limit
+      queryBuilder.skip(skip).take(limit)
+    }
+
+    return await queryBuilder.getManyAndCount()
+  }
 }

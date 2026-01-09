@@ -37,7 +37,8 @@
     "db:fresh": "npm run migration:drop && npm run rimraf -- src/@core/database/migrations/* && npm run migration:generate -- src/@core/database/migrations/InitialMigration && npm run migration:run && npm run seed:run",
     "db:setup": "npm run migration:run && npm run seed:run",
     "email:test": "ts-node -r tsconfig-paths/register src/@core/email/email.test.ts",
-    "email:template:create": "ts-node -r tsconfig-paths/register src/@core/email/scripts/create-template.ts"
+    "email:template:create": "ts-node -r tsconfig-paths/register src/@core/email/scripts/create-template.ts",
+    "logger:test": "ts-node -r tsconfig-paths/register src/@core/logger/logger.test.ts"
   },
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
@@ -135,6 +136,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/jest.setup.ts"
+    ],
     "moduleNameMapper": {
       "^@core/(.*)$": "<rootDir>/@core/$1",
       "^@core$": "<rootDir>/@core",

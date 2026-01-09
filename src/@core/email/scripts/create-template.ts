@@ -124,8 +124,13 @@ function createTemplate() {
   }
 
   if (fs.existsSync(templatePath)) {
-    console.error(chalk.red('✖ El template ya existe:'), chalk.white(templatePath))
-    console.log(chalk.yellow('\n💡 Usa otro nombre o elimina el template existente'))
+    console.error(
+      chalk.red('✖ El template ya existe:'),
+      chalk.white(templatePath),
+    )
+    console.log(
+      chalk.yellow('\n💡 Usa otro nombre o elimina el template existente'),
+    )
     console.log('')
     process.exit(1)
   }

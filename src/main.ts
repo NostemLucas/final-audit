@@ -1,14 +1,14 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { NestFactory } from '@nestjs/core'
+import { AppModule } from './app.module'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import { LoggerService } from '@core/logger';
+import { LoggerService } from '@core/logger'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule)
   const logger = app.get(LoggerService)
   const port = Number(process.env.PORT) || 3001
   app.useLogger(logger)
-    const config = new DocumentBuilder()
+  const config = new DocumentBuilder()
     .setTitle('ATR API')
     .setDescription(
       'API de auditorías, plantillas, frameworks de madurez y gestión de usuarios',
@@ -46,6 +46,6 @@ async function bootstrap() {
   )
   const document = SwaggerModule.createDocument(app, config)
   SwaggerModule.setup('api', app, document)
-  await app.listen(process.env.PORT ?? port);
+  await app.listen(process.env.PORT ?? port)
 }
-bootstrap();
+bootstrap()
