@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { ClsService } from 'nestjs-cls'
+import { TransactionService } from '@core/database'
 import { BaseRepository } from '@core/repositories/base.repository'
 import { UserEntity } from '../entities/user.entity'
 import { IUsersRepository } from './users-repository.interface'
@@ -14,9 +14,9 @@ export class UsersRepository
   constructor(
     @InjectRepository(UserEntity)
     repository: Repository<UserEntity>,
-    cls: ClsService,
+    transactionService: TransactionService,
   ) {
-    super(repository, cls)
+    super(repository, transactionService)
   }
 
   async findByEmail(email: string): Promise<UserEntity | null> {

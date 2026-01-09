@@ -3,15 +3,13 @@ import {
   type DeepPartial,
   type FindManyOptions,
   type FindOneOptions,
-  type EntityManager,
   type FindOptionsWhere,
   type Repository,
   In,
 } from 'typeorm'
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 import { IBaseRepository } from './base-repository.interface'
-import { ClsService } from 'nestjs-cls'
-import { ENTITY_MANAGER_KEY } from '@core/database'
+import { TransactionService } from '@core/database'
 import {
   PaginationDto,
   PaginatedResponse,
@@ -23,19 +21,22 @@ export abstract class BaseRepository<
 > implements IBaseRepository<T> {
   protected constructor(
     protected readonly repository: Repository<T>,
-    protected readonly cls: ClsService,
+    protected readonly transactionService: TransactionService,
   ) {}
 
   /**
    * Obtiene el repositorio correcto según el contexto:
-   * 1. Si hay una transacción activa en CLS, usa su EntityManager
+   * 1. Si hay una transacción activa, usa su EntityManager
    * 2. Si no, usa el repositorio por defecto
    *
+   * IMPORTANTE: Usa TransactionService para mantener consistencia
+   * en el manejo de transacciones en toda la aplicación
    */
   protected getRepo(): Repository<T> {
-    const contextEntityManager = this.cls.get<EntityManager>(ENTITY_MANAGER_KEY)
+    const contextEntityManager =
+      this.transactionService.getCurrentEntityManager()
 
-    // Si hay un EntityManager en CLS y tiene el método getRepository, usarlo
+    // Si hay un EntityManager activo, usarlo
     if (
       contextEntityManager &&
       typeof contextEntityManager.getRepository === 'function'
@@ -43,7 +44,7 @@ export abstract class BaseRepository<
       return contextEntityManager.getRepository(this.repository.target)
     }
 
-    // En cualquier otro caso, usar el repository por defecto
+    // No hay transacción activa, usar el repository por defecto
     return this.repository
   }
 

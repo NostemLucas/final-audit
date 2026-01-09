@@ -1,8 +1,7 @@
 import { Repository, EntityManager, Entity, Column } from 'typeorm'
-import { ClsService } from 'nestjs-cls'
 import { BaseRepository } from './base.repository'
 import { BaseEntity } from '@core/entities'
-import { ENTITY_MANAGER_KEY } from '@core/database'
+import { TransactionService } from '@core/database'
 
 /**
  * Tests para BaseRepository - Solo lógica de conmutación de repositorio
@@ -21,8 +20,11 @@ class TestEntity extends BaseEntity {
 
 // Repository con método público para testing
 class TestRepository extends BaseRepository<TestEntity> {
-  constructor(repository: Repository<TestEntity>, cls: ClsService) {
-    super(repository, cls)
+  constructor(
+    repository: Repository<TestEntity>,
+    transactionService: TransactionService,
+  ) {
+    super(repository, transactionService)
   }
 
   // Exponemos getRepo para probar directamente
@@ -33,13 +35,16 @@ class TestRepository extends BaseRepository<TestEntity> {
 
 // Tipos para mocks (evita 'any' y errores de ESLint)
 type MockRepository = Pick<Repository<TestEntity>, 'target'>
-type MockClsService = Pick<ClsService, 'get'>
+type MockTransactionService = Pick<
+  TransactionService,
+  'getCurrentEntityManager'
+>
 type MockEntityManager = Pick<EntityManager, 'getRepository'>
 
-describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
+describe('BaseRepository - Conmutación de Repositorio con TransactionService', () => {
   let testRepository: TestRepository
   let mockRepository: MockRepository
-  let mockClsService: jest.Mocked<MockClsService>
+  let mockTransactionService: jest.Mocked<MockTransactionService>
   let mockEntityManager: jest.Mocked<MockEntityManager>
   let mockTransactionRepository: MockRepository
 
@@ -57,13 +62,13 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
       getRepository: jest.fn().mockReturnValue(mockTransactionRepository),
     }
 
-    mockClsService = {
-      get: jest.fn().mockReturnValue(undefined),
+    mockTransactionService = {
+      getCurrentEntityManager: jest.fn().mockReturnValue(undefined),
     }
 
     testRepository = new TestRepository(
       mockRepository as Repository<TestEntity>,
-      mockClsService as unknown as ClsService,
+      mockTransactionService as unknown as TransactionService,
     )
   })
 
@@ -78,19 +83,21 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
   describe('Escenario A: Sin EntityManager en CLS', () => {
     it('debe usar el repositorio por defecto cuando CLS devuelve undefined', () => {
       // Arrange
-      mockClsService.get.mockReturnValue(undefined)
+      mockTransactionService.getCurrentEntityManager.mockReturnValue(undefined)
 
       // Act
       const repo = testRepository.getRepoPublic()
 
       // Assert
-      expect(mockClsService.get).toHaveBeenCalledWith(ENTITY_MANAGER_KEY)
+      expect(mockTransactionService.getCurrentEntityManager).toHaveBeenCalled()
       expect(repo).toBe(mockRepository)
     })
 
     it('debe usar el repositorio por defecto cuando CLS devuelve null', () => {
       // Arrange
-      mockClsService.get.mockReturnValue(null as unknown as EntityManager)
+      mockTransactionService.getCurrentEntityManager.mockReturnValue(
+        null as unknown as EntityManager,
+      )
 
       // Act
       const repo = testRepository.getRepoPublic()
@@ -107,7 +114,7 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
   describe('Escenario B: Con EntityManager en CLS', () => {
     it('debe usar el repositorio transaccional cuando CLS tiene EntityManager', () => {
       // Arrange
-      mockClsService.get.mockReturnValue(
+      mockTransactionService.getCurrentEntityManager.mockReturnValue(
         mockEntityManager as unknown as EntityManager,
       )
 
@@ -115,14 +122,14 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
       const repo = testRepository.getRepoPublic()
 
       // Assert
-      expect(mockClsService.get).toHaveBeenCalledWith(ENTITY_MANAGER_KEY)
+      expect(mockTransactionService.getCurrentEntityManager).toHaveBeenCalled()
       expect(mockEntityManager.getRepository).toHaveBeenCalledWith(TestEntity)
       expect(repo).toBe(mockTransactionRepository)
     })
 
     it('debe solicitar el repositorio usando el target correcto', () => {
       // Arrange
-      mockClsService.get.mockReturnValue(
+      mockTransactionService.getCurrentEntityManager.mockReturnValue(
         mockEntityManager as unknown as EntityManager,
       )
 
@@ -144,7 +151,7 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
       const invalidEntityManager = {
         someOtherMethod: jest.fn(),
       }
-      mockClsService.get.mockReturnValue(
+      mockTransactionService.getCurrentEntityManager.mockReturnValue(
         invalidEntityManager as unknown as EntityManager,
       )
 
@@ -160,7 +167,7 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
       const invalidEntityManager = {
         getRepository: 'not a function',
       }
-      mockClsService.get.mockReturnValue(
+      mockTransactionService.getCurrentEntityManager.mockReturnValue(
         invalidEntityManager as unknown as EntityManager,
       )
 
@@ -173,7 +180,9 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
 
     it('debe usar repositorio por defecto cuando CLS devuelve objeto vacío', () => {
       // Arrange
-      mockClsService.get.mockReturnValue({} as unknown as EntityManager)
+      mockTransactionService.getCurrentEntityManager.mockReturnValue(
+        {} as unknown as EntityManager,
+      )
 
       // Act
       const repo = testRepository.getRepoPublic()
@@ -190,28 +199,31 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
   describe('Verificación: Comportamiento en múltiples llamadas', () => {
     it('debe consultar CLS en cada invocación de getRepo', () => {
       // Arrange
-      mockClsService.get.mockReturnValue(undefined)
+      mockTransactionService.getCurrentEntityManager.mockReturnValue(undefined)
 
       // Act - Llamar múltiples veces
       testRepository.getRepoPublic()
       testRepository.getRepoPublic()
       testRepository.getRepoPublic()
 
-      // Assert - Debe consultar CLS cada vez (no cachea)
-      expect(mockClsService.get).toHaveBeenCalledTimes(3)
-      expect(mockClsService.get).toHaveBeenCalledWith(ENTITY_MANAGER_KEY)
+      // Assert - Debe consultar TransactionService cada vez (no cachea)
+      expect(
+        mockTransactionService.getCurrentEntityManager,
+      ).toHaveBeenCalledTimes(3)
     })
 
     it('debe conmutar correctamente entre repositorio por defecto y transaccional', () => {
       // Arrange - Primera llamada sin transacción
-      mockClsService.get.mockReturnValueOnce(undefined)
+      mockTransactionService.getCurrentEntityManager.mockReturnValueOnce(
+        undefined,
+      )
 
       // Act & Assert - Primera llamada: repositorio por defecto
       let repo = testRepository.getRepoPublic()
       expect(repo).toBe(mockRepository)
 
       // Arrange - Segunda llamada CON transacción
-      mockClsService.get.mockReturnValueOnce(
+      mockTransactionService.getCurrentEntityManager.mockReturnValueOnce(
         mockEntityManager as unknown as EntityManager,
       )
 
@@ -220,14 +232,18 @@ describe('BaseRepository - Conmutación de Repositorio (CLS)', () => {
       expect(repo).toBe(mockTransactionRepository)
 
       // Arrange - Tercera llamada SIN transacción nuevamente
-      mockClsService.get.mockReturnValueOnce(undefined)
+      mockTransactionService.getCurrentEntityManager.mockReturnValueOnce(
+        undefined,
+      )
 
       // Act & Assert - Tercera llamada: repositorio por defecto otra vez
       repo = testRepository.getRepoPublic()
       expect(repo).toBe(mockRepository)
 
       // Verificar que se consultó CLS 3 veces
-      expect(mockClsService.get).toHaveBeenCalledTimes(3)
+      expect(
+        mockTransactionService.getCurrentEntityManager,
+      ).toHaveBeenCalledTimes(3)
     })
   })
 })
