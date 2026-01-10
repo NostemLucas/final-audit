@@ -1,5 +1,6 @@
-import { Entity, Column } from 'typeorm'
+import { Entity, Column, OneToMany } from 'typeorm'
 import { BaseEntity } from '@core/entities'
+import { UserEntity } from '../../users/entities/user.entity'
 
 @Entity('organizations')
 export class OrganizationEntity extends BaseEntity {
@@ -26,4 +27,8 @@ export class OrganizationEntity extends BaseEntity {
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean
+
+  // Relación inversa: Una organización tiene muchos usuarios
+  @OneToMany(() => UserEntity, (user) => user.organization)
+  users: UserEntity[]
 }

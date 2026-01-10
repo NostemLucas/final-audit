@@ -51,7 +51,8 @@ export class UserEntity extends BaseEntity {
   })
   status: UserStatus
 
-  @Column({ type: 'uuid' })
+  // Requerido: Todo usuario debe pertenecer a una organización
+  @Column({ type: 'uuid', nullable: false })
   organizationId: string
 
   @ManyToOne(() => OrganizationEntity, {

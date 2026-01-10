@@ -13,6 +13,7 @@ export interface IOrganizationRepository extends IBaseRepository<OrganizationEnt
   findAllActive(): Promise<OrganizationEntity[]>
   findActiveById(id: string): Promise<OrganizationEntity | null>
   findActiveByNit(nit: string): Promise<OrganizationEntity | null>
+  existsActiveById(id: string): Promise<boolean>
   countActiveUsers(organizationId: string): Promise<number>
   hardDelete(id: string): Promise<void>
 

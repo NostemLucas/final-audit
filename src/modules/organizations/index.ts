@@ -20,8 +20,12 @@ export * from './services/organizations.service'
 // 5. Exceptions (para manejo de errores en otros módulos)
 export * from './exceptions'
 
+// 6. Repository Token & Interface (para DI en otros módulos - NO implementación)
+export { ORGANIZATION_REPOSITORY } from './repositories'
+export type { IOrganizationRepository, OrganizationFilters } from './repositories'
+
 // ❌ NO exportar:
-// - Repository (implementación privada del módulo)
+// - Repository implementation (implementación privada del módulo)
 // - Factory (implementación privada del módulo)
 // - Validator (implementación privada del módulo)
 // - Controller (NestJS lo maneja automáticamente)

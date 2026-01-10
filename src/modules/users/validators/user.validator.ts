@@ -8,8 +8,8 @@ import {
   UserNotFoundException,
   OrganizationNotFoundForUserException,
 } from '../exceptions'
-import { ORGANIZATION_REPOSITORY } from '../../organizations/repositories'
-import type { IOrganizationRepository } from '../../organizations/repositories'
+import { ORGANIZATION_REPOSITORY } from '../../organizations'
+import type { IOrganizationRepository } from '../../organizations'
 
 /**
  * Servicio de validación de reglas de negocio para usuarios
@@ -75,10 +75,10 @@ export class UserValidator {
    * @throws OrganizationNotFoundForUserException si la organización no existe o está inactiva
    */
   async validateOrganizationExists(organizationId: string): Promise<void> {
-    const organization =
-      await this.organizationRepository.findActiveById(organizationId)
+    const exists =
+      await this.organizationRepository.existsActiveById(organizationId)
 
-    if (!organization) {
+    if (!exists) {
       throw new OrganizationNotFoundForUserException(organizationId)
     }
   }

@@ -1,209 +1,111 @@
-import { Injectable, Inject } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { PaginatedResponse } from '@core/dtos'
 import { OrganizationEntity } from '../entities/organization.entity'
 import {
   CreateOrganizationDto,
   UpdateOrganizationDto,
   FindOrganizationsDto,
 } from '../dtos'
-import type { IOrganizationRepository } from '../repositories'
-import { ORGANIZATION_REPOSITORY } from '../repositories'
-import { OrganizationValidator } from '../validators/organization.validator'
-import { OrganizationFactory } from '../factories/organization.factory'
 import {
-  OrganizationNotFoundException,
-  OrganizationHasActiveUsersException,
-} from '../exceptions'
-import { FilesService, FileType } from '@core/files'
-import { PaginatedResponse, PaginatedResponseBuilder } from '@core/dtos'
+  CreateOrganizationUseCase,
+  UpdateOrganizationUseCase,
+  FindAllOrganizationsUseCase,
+  FindOrganizationByIdUseCase,
+  FindOrganizationByNitUseCase,
+  FindOrganizationsWithFiltersUseCase,
+  UploadLogoUseCase,
+  RemoveOrganizationUseCase,
+  DeleteOrganizationUseCase,
+} from '../use-cases'
 
+/**
+ * Servicio de organizaciones - Actúa como fachada para los casos de uso
+ *
+ * Este servicio delega todas las operaciones a casos de uso específicos,
+ * proporcionando una API pública consistente para el controlador.
+ */
 @Injectable()
 export class OrganizationsService {
   constructor(
-    @Inject(ORGANIZATION_REPOSITORY)
-    private readonly organizationRepository: IOrganizationRepository,
-    private readonly validator: OrganizationValidator,
-    private readonly organizationFactory: OrganizationFactory,
-    private readonly filesService: FilesService,
+    private readonly createOrganizationUseCase: CreateOrganizationUseCase,
+    private readonly updateOrganizationUseCase: UpdateOrganizationUseCase,
+    private readonly findAllOrganizationsUseCase: FindAllOrganizationsUseCase,
+    private readonly findOrganizationByIdUseCase: FindOrganizationByIdUseCase,
+    private readonly findOrganizationByNitUseCase: FindOrganizationByNitUseCase,
+    private readonly findOrganizationsWithFiltersUseCase: FindOrganizationsWithFiltersUseCase,
+    private readonly uploadLogoUseCase: UploadLogoUseCase,
+    private readonly removeOrganizationUseCase: RemoveOrganizationUseCase,
+    private readonly deleteOrganizationUseCase: DeleteOrganizationUseCase,
   ) {}
 
-  async create(
-    createOrganizationDto: CreateOrganizationDto,
-  ): Promise<OrganizationEntity> {
-    await this.validator.validateUniqueConstraints(
-      createOrganizationDto.name,
-      createOrganizationDto.nit,
-    )
-
-    // Crear organización usando el factory (normaliza datos automáticamente)
-    const organization = this.organizationFactory.createFromDto(
-      createOrganizationDto,
-    )
-
-    return await this.organizationRepository.save(organization)
-  }
-
-  async findAll(): Promise<OrganizationEntity[]> {
-    return await this.organizationRepository.findAllActive()
+  /**
+   * Crea una nueva organización
+   */
+  async create(dto: CreateOrganizationDto): Promise<OrganizationEntity> {
+    return await this.createOrganizationUseCase.execute(dto)
   }
 
   /**
-   * Busca organizaciones con paginación y filtros personalizados
-   *
-   * @param query - DTO con parámetros de paginación y filtros
-   * @returns Respuesta paginada con organizaciones
-   *
-   * @example
-   * ```typescript
-   * // Todas las organizaciones
-   * await service.findWithFilters({ all: true })
-   *
-   * // Primera página con 10 registros
-   * await service.findWithFilters({ page: 1, limit: 10 })
-   *
-   * // Buscar por texto
-   * await service.findWithFilters({ search: 'coca', page: 1, limit: 10 })
-   *
-   * // Solo activas con logo
-   * await service.findWithFilters({ isActive: true, hasLogo: true, all: true })
-   * ```
+   * Lista todas las organizaciones activas
+   */
+  async findAll(): Promise<OrganizationEntity[]> {
+    return await this.findAllOrganizationsUseCase.execute()
+  }
+
+  /**
+   * Busca organizaciones con paginación y filtros
    */
   async findWithFilters(
     query: FindOrganizationsDto,
   ): Promise<PaginatedResponse<OrganizationEntity>> {
-    const {
-      page = 1,
-      limit = 10,
-      all = false,
-      sortBy = 'createdAt',
-      sortOrder = 'DESC',
-      search,
-      isActive,
-      hasLogo,
-    } = query
-
-    // Construir filtros
-    const filters = {
-      search,
-      isActive,
-      hasLogo,
-    }
-
-    // Si all=true, devolver todos los registros
-    if (all) {
-      const [data] = await this.organizationRepository.findWithFilters(
-        filters,
-        undefined,
-        undefined,
-        sortBy,
-        sortOrder,
-      )
-      return PaginatedResponseBuilder.createAll(data)
-    }
-
-    // Paginación normal
-    const [data, total] = await this.organizationRepository.findWithFilters(
-      filters,
-      page,
-      limit,
-      sortBy,
-      sortOrder,
-    )
-
-    return PaginatedResponseBuilder.create(data, total, page, limit)
+    return await this.findOrganizationsWithFiltersUseCase.execute(query)
   }
 
+  /**
+   * Busca una organización activa por ID
+   */
   async findOne(id: string): Promise<OrganizationEntity> {
-    const organization = await this.organizationRepository.findActiveById(id)
-
-    if (!organization) {
-      throw new OrganizationNotFoundException(id)
-    }
-
-    return organization
+    return await this.findOrganizationByIdUseCase.execute(id)
   }
 
+  /**
+   * Busca una organización activa por NIT
+   */
   async findByNit(nit: string): Promise<OrganizationEntity> {
-    const organization = await this.organizationRepository.findActiveByNit(nit)
-
-    if (!organization) {
-      throw new OrganizationNotFoundException(nit, 'NIT')
-    }
-
-    return organization
+    return await this.findOrganizationByNitUseCase.execute(nit)
   }
 
+  /**
+   * Actualiza una organización
+   */
   async update(
     id: string,
-    updateOrganizationDto: UpdateOrganizationDto,
+    dto: UpdateOrganizationDto,
   ): Promise<OrganizationEntity> {
-    const organization = await this.findOne(id)
-
-    if (
-      updateOrganizationDto.name &&
-      updateOrganizationDto.name !== organization.name
-    ) {
-      await this.validator.validateUniqueName(updateOrganizationDto.name, id)
-    }
-
-    if (
-      updateOrganizationDto.nit &&
-      updateOrganizationDto.nit !== organization.nit
-    ) {
-      await this.validator.validateUniqueNit(updateOrganizationDto.nit, id)
-    }
-
-    // Actualizar organización usando el factory (normaliza datos automáticamente)
-    const updatedOrganization = this.organizationFactory.updateFromDto(
-      organization,
-      updateOrganizationDto,
-    )
-
-    return await this.organizationRepository.save(updatedOrganization)
+    return await this.updateOrganizationUseCase.execute(id, dto)
   }
 
+  /**
+   * Sube el logo de la organización
+   */
   async uploadLogo(
     id: string,
     file: Express.Multer.File,
   ): Promise<OrganizationEntity> {
-    const organization = await this.findOne(id)
-
-    // Subir nuevo logo usando FilesService
-    const uploadResult = await this.filesService.replaceFile(
-      organization.logoUrl,
-      {
-        file,
-        folder: 'organizations/logos',
-        customFileName: `org-${id}`,
-        overwrite: true,
-        validationOptions: {
-          fileType: FileType.IMAGE,
-          maxSize: 5 * 1024 * 1024, // 5MB
-          maxWidth: 1024,
-          maxHeight: 1024,
-        },
-      },
-    )
-
-    // Actualizar organización con nueva URL
-    organization.logoUrl = uploadResult.filePath
-    return await this.organizationRepository.save(organization)
+    return await this.uploadLogoUseCase.execute(id, file)
   }
 
+  /**
+   * Elimina una organización (soft delete)
+   */
   async remove(id: string): Promise<void> {
-    const organization = await this.findOne(id)
-
-    const activeUsersCount =
-      await this.organizationRepository.countActiveUsers(id)
-
-    if (activeUsersCount > 0) {
-      throw new OrganizationHasActiveUsersException()
-    }
-
-    organization.isActive = false
-    await this.organizationRepository.save(organization)
+    return await this.removeOrganizationUseCase.execute(id)
   }
 
+  /**
+   * Elimina permanentemente una organización (hard delete)
+   */
   async delete(id: string): Promise<void> {
-    await this.organizationRepository.hardDelete(id)
+    return await this.deleteOrganizationUseCase.execute(id)
   }
 }

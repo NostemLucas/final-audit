@@ -221,6 +221,7 @@ export function createTestOrganization(
     email: 'test@test.com',
     logoUrl: null,
     isActive: true,
+    users: [],
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: undefined,

@@ -1,174 +1,119 @@
-import { Injectable, Inject } from '@nestjs/common'
-import { Transactional } from '@core/database'
-import { FilesService, FileType } from '@core/files'
-import { USERS_REPOSITORY } from '../repositories'
-import type { IUsersRepository } from '../repositories'
-import { UserValidator } from '../validators/user.validator'
-import { UserFactory } from '../factories/user.factory'
+import { Injectable } from '@nestjs/common'
 import { CreateUserDto, UpdateUserDto } from '../dtos'
-import { UserEntity, UserStatus } from '../entities/user.entity'
-import { UserNotFoundException } from '../exceptions'
+import { UserEntity } from '../entities/user.entity'
+import {
+  CreateUserUseCase,
+  UpdateUserUseCase,
+  FindAllUsersUseCase,
+  FindUserByIdUseCase,
+  FindUserByEmailUseCase,
+  FindUserByUsernameUseCase,
+  FindUserByCIUseCase,
+  FindUsersByOrganizationUseCase,
+  UploadProfileImageUseCase,
+  DeactivateUserUseCase,
+  RemoveUserUseCase,
+} from '../use-cases'
 
+/**
+ * Servicio de usuarios - Actúa como fachada para los casos de uso
+ *
+ * Este servicio delega todas las operaciones a casos de uso específicos,
+ * proporcionando una API pública consistente para el controlador.
+ */
 @Injectable()
 export class UsersService {
   constructor(
-    @Inject(USERS_REPOSITORY)
-    private readonly usersRepository: IUsersRepository,
-    private readonly validator: UserValidator,
-    private readonly userFactory: UserFactory,
-    private readonly filesService: FilesService,
+    private readonly createUserUseCase: CreateUserUseCase,
+    private readonly updateUserUseCase: UpdateUserUseCase,
+    private readonly findAllUsersUseCase: FindAllUsersUseCase,
+    private readonly findUserByIdUseCase: FindUserByIdUseCase,
+    private readonly findUserByEmailUseCase: FindUserByEmailUseCase,
+    private readonly findUserByUsernameUseCase: FindUserByUsernameUseCase,
+    private readonly findUserByCIUseCase: FindUserByCIUseCase,
+    private readonly findUsersByOrganizationUseCase: FindUsersByOrganizationUseCase,
+    private readonly uploadProfileImageUseCase: UploadProfileImageUseCase,
+    private readonly deactivateUserUseCase: DeactivateUserUseCase,
+    private readonly removeUserUseCase: RemoveUserUseCase,
   ) {}
 
   /**
    * Crea un nuevo usuario
-   * Valida unicidad de email, username y CI antes de crear
-   * Hashea la contraseña automáticamente usando el UserFactory
    */
-  @Transactional()
   async create(dto: CreateUserDto): Promise<UserEntity> {
-    // Validar unicidad de email, username y CI
-    await this.validator.validateUniqueConstraints(
-      dto.email,
-      dto.username,
-      dto.ci,
-    )
-
-    // Crear usuario usando el factory (hashea la contraseña automáticamente)
-    const user = this.userFactory.createFromDto(dto)
-
-    // Guardar en BD
-    return await this.usersRepository.save(user)
+    return await this.createUserUseCase.execute(dto)
   }
 
   /**
    * Lista todos los usuarios
    */
   async findAll(): Promise<UserEntity[]> {
-    return await this.usersRepository.findAll()
+    return await this.findAllUsersUseCase.execute()
   }
 
   /**
    * Busca un usuario por ID
-   * @throws UserNotFoundException si no se encuentra
    */
   async findOne(id: string): Promise<UserEntity> {
-    const user = await this.usersRepository.findById(id)
-
-    if (!user) {
-      throw new UserNotFoundException(id)
-    }
-
-    return user
+    return await this.findUserByIdUseCase.execute(id)
   }
 
   /**
    * Busca un usuario por email
-   * @returns Usuario o null si no existe
    */
-  async findByEmail(email: string): Promise<UserEntity | null> {
-    return await this.usersRepository.findByEmail(email)
+  async findByEmail(email: string): Promise<UserEntity> {
+    return await this.findUserByEmailUseCase.execute(email)
   }
 
   /**
    * Busca un usuario por username
-   * @returns Usuario o null si no existe
    */
-  async findByUsername(username: string): Promise<UserEntity | null> {
-    return await this.usersRepository.findByUsername(username)
+  async findByUsername(username: string): Promise<UserEntity> {
+    return await this.findUserByUsernameUseCase.execute(username)
   }
 
   /**
    * Busca un usuario por CI
-   * @returns Usuario o null si no existe
    */
-  async findByCI(ci: string): Promise<UserEntity | null> {
-    return await this.usersRepository.findByCI(ci)
+  async findByCI(ci: string): Promise<UserEntity> {
+    return await this.findUserByCIUseCase.execute(ci)
   }
 
   /**
    * Lista usuarios por organización
    */
   async findByOrganization(organizationId: string): Promise<UserEntity[]> {
-    return await this.usersRepository.findByOrganization(organizationId)
+    return await this.findUsersByOrganizationUseCase.execute(organizationId)
   }
 
   /**
    * Actualiza un usuario
-   * Valida unicidad solo de los campos que cambiaron
-   * NO actualiza la contraseña (se hace en módulo de autenticación)
    */
-  @Transactional()
   async update(id: string, dto: UpdateUserDto): Promise<UserEntity> {
-    const user = await this.findOne(id)
-
-    // Validar solo campos que cambiaron
-    if (dto.email && dto.email !== user.email) {
-      await this.validator.validateUniqueEmail(dto.email, id)
-    }
-
-    if (dto.username && dto.username !== user.username) {
-      await this.validator.validateUniqueUsername(dto.username, id)
-    }
-
-    if (dto.ci && dto.ci !== user.ci) {
-      await this.validator.validateUniqueCI(dto.ci, id)
-    }
-
-    // Actualizar usuario usando el factory
-    const updatedUser = this.userFactory.updateFromDto(user, dto)
-
-    // Guardar cambios
-    return await this.usersRepository.save(updatedUser)
+    return await this.updateUserUseCase.execute(id, dto)
   }
 
   /**
    * Sube la imagen de perfil del usuario
-   * Reemplaza la imagen anterior si existe
    */
-  @Transactional()
   async uploadProfileImage(
     id: string,
     file: Express.Multer.File,
   ): Promise<UserEntity> {
-    const user = await this.findOne(id)
-
-    // Subir nueva imagen usando FilesService
-    const uploadResult = await this.filesService.replaceFile(user.image, {
-      file,
-      folder: 'users/profiles',
-      customFileName: `user-${id}`,
-      overwrite: true,
-      validationOptions: {
-        fileType: FileType.IMAGE,
-        maxSize: 2 * 1024 * 1024, // 2MB
-        maxWidth: 512,
-        maxHeight: 512,
-      },
-    })
-
-    // Actualizar usuario con nueva URL
-    user.image = uploadResult.filePath
-    return await this.usersRepository.save(user)
+    return await this.uploadProfileImageUseCase.execute(id, file)
   }
 
   /**
-   * Desactiva un usuario (cambia estado a INACTIVE)
+   * Desactiva un usuario
    */
-  @Transactional()
   async deactivate(id: string): Promise<UserEntity> {
-    const user = await this.findOne(id)
-
-    user.status = UserStatus.INACTIVE
-    return await this.usersRepository.save(user)
+    return await this.deactivateUserUseCase.execute(id)
   }
 
   /**
    * Elimina un usuario (soft delete)
-   * Marca el usuario como eliminado sin borrar sus datos
    */
-  @Transactional()
   async remove(id: string): Promise<void> {
-    const user = await this.findOne(id)
-    await this.usersRepository.softDelete(user.id)
+    return await this.removeUserUseCase.execute(id)
   }
 }

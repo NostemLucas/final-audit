@@ -6,12 +6,37 @@ import { OrganizationsService } from './services/organizations.service'
 import { OrganizationRepository, ORGANIZATION_REPOSITORY } from './repositories'
 import { OrganizationValidator } from './validators/organization.validator'
 import { OrganizationFactory } from './factories/organization.factory'
+import {
+  CreateOrganizationUseCase,
+  UpdateOrganizationUseCase,
+  FindAllOrganizationsUseCase,
+  FindOrganizationByIdUseCase,
+  FindOrganizationByNitUseCase,
+  FindOrganizationsWithFiltersUseCase,
+  UploadLogoUseCase,
+  RemoveOrganizationUseCase,
+  DeleteOrganizationUseCase,
+} from './use-cases'
 
 @Module({
   imports: [TypeOrmModule.forFeature([OrganizationEntity])],
   controllers: [OrganizationsController],
   providers: [
+    // Service (facade)
     OrganizationsService,
+
+    // Use Cases
+    CreateOrganizationUseCase,
+    UpdateOrganizationUseCase,
+    FindAllOrganizationsUseCase,
+    FindOrganizationByIdUseCase,
+    FindOrganizationByNitUseCase,
+    FindOrganizationsWithFiltersUseCase,
+    UploadLogoUseCase,
+    RemoveOrganizationUseCase,
+    DeleteOrganizationUseCase,
+
+    // Infrastructure
     OrganizationValidator,
     OrganizationFactory,
     {
@@ -19,6 +44,10 @@ import { OrganizationFactory } from './factories/organization.factory'
       useClass: OrganizationRepository,
     },
   ],
-  exports: [OrganizationsService, TypeOrmModule],
+  exports: [
+    OrganizationsService,
+    ORGANIZATION_REPOSITORY, // Exportar para que otros módulos puedan inyectarlo
+    TypeOrmModule,
+  ],
 })
 export class OrganizationsModule {}

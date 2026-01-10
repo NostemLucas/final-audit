@@ -53,6 +53,17 @@ export class OrganizationRepository
     })
   }
 
+  /**
+   * Verifica si existe una organización activa con el ID dado
+   * Útil para validaciones sin necesidad de cargar la entidad completa
+   */
+  async existsActiveById(id: string): Promise<boolean> {
+    const count = await this.getRepo().count({
+      where: { id, isActive: true },
+    })
+    return count > 0
+  }
+
   async countActiveUsers(organizationId: string): Promise<number> {
     return await this.getRepo()
       .createQueryBuilder('org')
