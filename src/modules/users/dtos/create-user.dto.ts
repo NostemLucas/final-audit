@@ -116,13 +116,12 @@ export class CreateUserDto {
   @MaxLength(200, { message: 'La dirección no puede exceder 200 caracteres' })
   address?: string
 
-  @ApiPropertyOptional({
-    description: 'ID de la organización a la que pertenece el usuario',
+  @ApiProperty({
+    description: 'ID de la organización a la que pertenece el usuario (requerido)',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @IsOptional()
   @IsUUID('4', { message: 'El ID de organización debe ser un UUID válido' })
-  organizationId?: string
+  organizationId: string
 
   @ApiProperty({
     description: 'Roles del usuario',

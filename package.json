@@ -144,6 +144,9 @@
       "^@core$": "<rootDir>/@core",
       "^@shared/(.*)$": "<rootDir>/@shared/$1",
       "^@shared$": "<rootDir>/@shared"
-    }
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(chalk|#ansi-styles|#supports-color)/)"
+    ]
   }
 }

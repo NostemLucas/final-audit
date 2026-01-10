@@ -81,7 +81,7 @@ export const TEST_USERS = {
     password: bcrypt.hashSync('InactivePass123!', 10),
     phone: null,
     address: null,
-    organizationId: null,
+    organizationId: 'org-1', // ✅ Ahora es requerido
     roles: [Role.USUARIO],
     status: UserStatus.INACTIVE,
     image: null,
@@ -102,6 +102,7 @@ export class UserBuilder {
     username: 'testuser',
     ci: '12345678',
     password: bcrypt.hashSync('TestPass123!', 10),
+    organizationId: 'default-org-id', // ✅ organizationId requerido
     roles: [Role.USUARIO],
     status: UserStatus.ACTIVE,
     image: null,
@@ -191,7 +192,7 @@ export function createTestUser(overrides?: Partial<UserEntity>): UserEntity {
     password: bcrypt.hashSync('TestPass123!', 10),
     phone: null,
     address: null,
-    organizationId: null,
+    organizationId: 'test-org-id', // ✅ organizationId requerido
     roles: [Role.USUARIO],
     status: UserStatus.ACTIVE,
     image: null,
@@ -199,5 +200,5 @@ export function createTestUser(overrides?: Partial<UserEntity>): UserEntity {
     updatedAt: new Date(),
     deletedAt: undefined,
     ...overrides,
-  }
+  } as UserEntity
 }

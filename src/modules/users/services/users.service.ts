@@ -16,8 +16,6 @@ export class UsersService {
     private readonly usersRepository: IUsersRepository,
     private readonly validator: UserValidator,
     private readonly userFactory: UserFactory,
-    // ✅ Ya NO necesitamos inyectar TransactionService
-    // El decorador @Transactional() usa Discovery automáticamente
     private readonly filesService: FilesService,
   ) {}
 

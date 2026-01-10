@@ -6,7 +6,10 @@ import {
   UsernameAlreadyExistsException,
   CiAlreadyExistsException,
   UserNotFoundException,
+  OrganizationNotFoundForUserException,
 } from '../exceptions'
+import { ORGANIZATION_REPOSITORY } from '../../organizations/repositories'
+import type { IOrganizationRepository } from '../../organizations/repositories'
 
 /**
  * Servicio de validación de reglas de negocio para usuarios
@@ -17,6 +20,8 @@ export class UserValidator {
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: IUsersRepository,
+    @Inject(ORGANIZATION_REPOSITORY)
+    private readonly organizationRepository: IOrganizationRepository,
   ) {}
 
   /**
@@ -61,6 +66,20 @@ export class UserValidator {
     const exists = await this.usersRepository.existsByCI(ci, excludeId)
     if (exists) {
       throw new CiAlreadyExistsException(ci)
+    }
+  }
+
+  /**
+   * Valida que la organización existe y está activa
+   * @param organizationId - ID de la organización a validar
+   * @throws OrganizationNotFoundForUserException si la organización no existe o está inactiva
+   */
+  async validateOrganizationExists(organizationId: string): Promise<void> {
+    const organization =
+      await this.organizationRepository.findActiveById(organizationId)
+
+    if (!organization) {
+      throw new OrganizationNotFoundForUserException(organizationId)
     }
   }
 

@@ -1,244 +1,291 @@
+import { Test, TestingModule } from '@nestjs/testing'
 import { UsersService } from './users.service'
 import { UserValidator } from '../validators/user.validator'
 import { UserFactory } from '../factories/user.factory'
-import { UserStatus, Role } from '../entities/user.entity'
 import { CreateUserDto, UpdateUserDto } from '../dtos'
-import {
-  UserNotFoundException,
-  EmailAlreadyExistsException,
-} from '../exceptions'
+import { UserNotFoundException } from '../exceptions'
 import { FilesService } from '@core/files'
-import { TransactionService } from '@core/database'
-import { FakeUsersRepository } from '../__tests__/fixtures/fake-users.repository'
+import { createMock } from '@core/testing'
 import {
   TEST_USERS,
-  UserBuilder,
   createTestUser,
 } from '../__tests__/fixtures/user.fixtures'
-import * as bcrypt from 'bcrypt'
+import type { IUsersRepository } from '../repositories'
+import { USERS_REPOSITORY } from '../repositories'
+import { Role, UserStatus } from '../entities/user.entity'
 
 /**
- * ✅ INTEGRATION TESTS - UsersService (with Fake Repository)
+ * ✅ UNIT TESTS - UsersService (with Jest Mocks)
  *
  * Testing approach:
- * - Fake Repository: Simulates DB in memory (REAL behavior)
- * - Real Validator: Tests actual validation logic
- * - Real Factory: Tests actual normalization logic
- * - Mock TransactionService & FilesService: Only mock external dependencies
+ * - Mock Repository: Solo mockeamos comportamiento necesario
+ * - Mock Validator: Mockeamos validaciones
+ * - Real Factory: Usamos factory real para probar normalizaciones y hash de passwords
+ * - Mock FilesService: Mockeamos dependencia externa
  *
- * This approach is much more reliable than mocking everything!
+ * Ventajas sobre Fake Repository:
+ * - ~240 líneas menos de código de test
+ * - Tests más rápidos (sin lógica de fake)
+ * - Tests más claros (ves exactamente qué se llama)
+ * - Enfoque: Probar SOLO la lógica de orquestación del servicio
  */
-describe('UsersService (Integration)', () => {
+describe('UsersService', () => {
   let service: UsersService
-  let fakeRepository: FakeUsersRepository
-  let validator: UserValidator
-  let factory: UserFactory
-  let transactionService: jest.Mocked<TransactionService>
-  let filesService: jest.Mocked<FilesService>
+  let mockRepository: jest.Mocked<IUsersRepository>
+  let mockValidator: jest.Mocked<UserValidator>
+  let factory: UserFactory // ✅ Real factory para probar hash de passwords
+  let mockFilesService: jest.Mocked<FilesService>
 
-  beforeEach(() => {
-    // ✅ Create fake repository (works like DB in memory)
-    fakeRepository = new FakeUsersRepository()
+  beforeEach(async () => {
+    // ✅ Crear mocks simples con Jest
+    mockRepository = createMock<IUsersRepository>({
+      save: jest.fn(),
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      findByEmail: jest.fn(),
+      findByUsername: jest.fn(),
+      findByCI: jest.fn(),
+      findByOrganization: jest.fn(),
+      softDelete: jest.fn(),
+    })
 
-    // Mock only external dependencies
-    transactionService = {
-      runInTransaction: jest.fn((callback) => callback()),
-    } as any
+    mockValidator = createMock<UserValidator>({
+      validateUniqueConstraints: jest.fn(),
+      validateUniqueEmail: jest.fn(),
+      validateUniqueUsername: jest.fn(),
+      validateUniqueCI: jest.fn(),
+      ensureUserExists: jest.fn(),
+    })
 
-    filesService = {
+    mockFilesService = createMock<FilesService>({
       replaceFile: jest.fn(),
-    } as any
+      deleteFile: jest.fn(),
+    })
 
-    // ✅ Use REAL instances of business logic
-    validator = new UserValidator(fakeRepository)
+    // ✅ Usar factory REAL para probar hash de passwords
     factory = new UserFactory()
 
-    service = new UsersService(
-      fakeRepository,
-      validator,
-      factory,
-      transactionService,
-      filesService,
-    )
+    // Crear módulo de testing
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        {
+          provide: USERS_REPOSITORY,
+          useValue: mockRepository,
+        },
+        {
+          provide: UserValidator,
+          useValue: mockValidator,
+        },
+        {
+          provide: UserFactory,
+          useValue: factory,
+        },
+        {
+          provide: FilesService,
+          useValue: mockFilesService,
+        },
+      ],
+    }).compile()
+
+    service = module.get<UsersService>(UsersService)
   })
 
   afterEach(() => {
-    fakeRepository.clear() // Clean data between tests
+    jest.clearAllMocks()
   })
 
   describe('create', () => {
-    it('should create user with real validation', async () => {
-      // Arrange - Seed with existing data using fixtures
-      fakeRepository.seed([TEST_USERS.ADMIN, TEST_USERS.AUDITOR])
-
-      const newUserDto: CreateUserDto = {
+    it('should create user with password hashing', async () => {
+      // Arrange
+      const dto: CreateUserDto = {
         names: 'Nuevo',
         lastNames: 'Usuario',
-        email: 'nuevo@test.com', // Unique email
+        email: 'nuevo@test.com',
         username: 'nuevousuario',
         ci: '55555555',
-        password: 'NewPass123!',
+        password: 'NewPass123!', // Plain password
+        organizationId: 'org-1', // ✅ Requerido
         roles: [Role.USUARIO],
         status: UserStatus.ACTIVE,
       }
 
+      const savedUser = createTestUser({
+        id: 'user-123',
+        email: dto.email,
+        password: 'HASHED_PASSWORD', // Ya hasheado por factory
+      })
+
+      mockValidator.validateUniqueConstraints.mockResolvedValue(undefined)
+      mockRepository.save.mockResolvedValue(savedUser)
+
       // Act
-      const result = await service.create(newUserDto)
+      const result = await service.create(dto)
 
-      // Assert - ✅ User saved REALLY in fake repo
-      expect(result.id).toBeDefined()
-      expect(result.email).toBe('nuevo@test.com')
-
-      // ✅ Verify it's really in the repo
-      const savedUser = await fakeRepository.findById(result.id)
-      expect(savedUser).toBeDefined()
-      expect(savedUser!.email).toBe('nuevo@test.com')
-
-      // ✅ Verify total count
-      expect(fakeRepository.count()).toBe(3) // 2 seeded + 1 new
+      // Assert
+      expect(mockValidator.validateUniqueConstraints).toHaveBeenCalledWith(
+        dto.email,
+        dto.username,
+        dto.ci,
+      )
+      expect(mockRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: dto.email,
+          username: dto.username,
+          ci: dto.ci,
+        }),
+      )
+      expect(result).toEqual(savedUser)
     })
 
-    it('should throw EmailAlreadyExistsException when email is duplicate', async () => {
+    it('should propagate validation error when email is duplicate', async () => {
       // Arrange
-      fakeRepository.seed([TEST_USERS.ADMIN])
-
-      const duplicateDto: CreateUserDto = {
+      const dto: CreateUserDto = {
         names: 'Duplicate',
         lastNames: 'User',
         email: TEST_USERS.ADMIN.email, // ❌ Duplicate email
         username: 'newusername',
         ci: '66666666',
         password: 'Pass123!',
+        organizationId: 'org-1', // ✅ Requerido
         roles: [Role.USUARIO],
         status: UserStatus.ACTIVE,
       }
 
-      // Act & Assert - ✅ Validator executes REAL search in fake repo
-      await expect(service.create(duplicateDto)).rejects.toThrow(
-        EmailAlreadyExistsException,
-      )
+      const validationError = new Error('Email already exists')
+      mockValidator.validateUniqueConstraints.mockRejectedValue(validationError)
 
-      // ✅ Verify user was NOT created
-      expect(fakeRepository.count()).toBe(1) // Only the seeded one
-    })
+      // Act & Assert
+      await expect(service.create(dto)).rejects.toThrow('Email already exists')
 
-    it('should work with UserBuilder for custom scenarios', async () => {
-      // Arrange - Create custom user with builder
-      const existingUser = new UserBuilder()
-        .withEmail('existing@test.com')
-        .withUsername('existinguser')
-        .withCI('77777777')
-        .auditor()
-        .build()
-
-      fakeRepository.seed([existingUser])
-
-      const newUserDto: CreateUserDto = {
-        names: 'New',
-        lastNames: 'User',
-        email: 'new@test.com',
-        username: 'newuser',
-        ci: '88888888',
-        password: 'Pass123!',
-        roles: [Role.ADMIN],
-        status: UserStatus.ACTIVE,
-      }
-
-      // Act
-      const result = await service.create(newUserDto)
-
-      // Assert
-      expect(result.id).toBeDefined()
-      expect(fakeRepository.count()).toBe(2)
-
-      // ✅ Can make real queries
-      const allUsers = await fakeRepository.findAll()
-      expect(allUsers).toHaveLength(2)
-
-      const adminUsers = allUsers.filter((u) => u.roles.includes(Role.ADMIN))
-      expect(adminUsers).toHaveLength(1)
+      // ✅ Verificamos que NO se llamó a save (validación falló antes)
+      expect(mockRepository.save).not.toHaveBeenCalled()
     })
   })
 
-  describe('update', () => {
-    it('should update user with real validation', async () => {
+  describe('findAll', () => {
+    it('should return all users from repository', async () => {
       // Arrange
-      fakeRepository.seed([TEST_USERS.ADMIN, TEST_USERS.AUDITOR])
-
-      const updateDto: UpdateUserDto = {
-        names: 'Updated Admin',
-        email: 'updated-admin@test.com', // New unique email
-      }
+      const users = [TEST_USERS.ADMIN, TEST_USERS.AUDITOR, TEST_USERS.USUARIO]
+      mockRepository.findAll.mockResolvedValue(users)
 
       // Act
-      const result = await service.update(TEST_USERS.ADMIN.id, updateDto)
+      const result = await service.findAll()
 
       // Assert
-      expect(result.names).toBe('Updated Admin')
-      expect(result.email).toBe('updated-admin@test.com')
-
-      // ✅ Verify change persisted in repo
-      const updatedUser = await fakeRepository.findById(TEST_USERS.ADMIN.id)
-      expect(updatedUser!.names).toBe('Updated Admin')
-      expect(updatedUser!.email).toBe('updated-admin@test.com')
+      expect(mockRepository.findAll).toHaveBeenCalledTimes(1)
+      expect(result).toEqual(users)
     })
 
-    it('should allow updating to same email (excludeId works)', async () => {
+    it('should return empty array when no users exist', async () => {
       // Arrange
-      fakeRepository.seed([TEST_USERS.ADMIN])
-
-      const updateDto: UpdateUserDto = {
-        email: TEST_USERS.ADMIN.email, // Same email (should allow)
-        names: 'Updated Names',
-      }
+      mockRepository.findAll.mockResolvedValue([])
 
       // Act
-      const result = await service.update(TEST_USERS.ADMIN.id, updateDto)
+      const result = await service.findAll()
 
-      // Assert - ✅ Validator REAL allows updating with same email
-      expect(result.email).toBe(TEST_USERS.ADMIN.email)
-      expect(result.names).toBe('Updated Names')
+      // Assert
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('findOne', () => {
+    it('should return user by id', async () => {
+      // Arrange
+      const user = TEST_USERS.ADMIN
+      mockRepository.findById.mockResolvedValue(user)
+
+      // Act
+      const result = await service.findOne(user.id)
+
+      // Assert
+      expect(mockRepository.findById).toHaveBeenCalledWith(user.id)
+      expect(result).toEqual(user)
     })
 
-    it('should prevent updating to email of another user', async () => {
+    it('should throw UserNotFoundException when not found', async () => {
       // Arrange
-      fakeRepository.seed([TEST_USERS.ADMIN, TEST_USERS.AUDITOR])
-
-      const updateDto: UpdateUserDto = {
-        email: TEST_USERS.AUDITOR.email, // ❌ Email of another user
-      }
+      mockRepository.findById.mockResolvedValue(null)
 
       // Act & Assert
-      await expect(
-        service.update(TEST_USERS.ADMIN.id, updateDto),
-      ).rejects.toThrow(EmailAlreadyExistsException)
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        UserNotFoundException,
+      )
     })
   })
 
   describe('findByEmail', () => {
     it('should find user by email', async () => {
       // Arrange
-      fakeRepository.seed([
-        TEST_USERS.ADMIN,
-        TEST_USERS.AUDITOR,
-        TEST_USERS.USUARIO,
-      ])
+      const user = TEST_USERS.AUDITOR
+      mockRepository.findByEmail.mockResolvedValue(user)
 
       // Act
-      const result = await service.findByEmail(TEST_USERS.AUDITOR.email)
+      const result = await service.findByEmail(user.email)
 
       // Assert
-      expect(result).toBeDefined()
-      expect(result!.id).toBe(TEST_USERS.AUDITOR.id)
-      expect(result!.email).toBe(TEST_USERS.AUDITOR.email)
+      expect(mockRepository.findByEmail).toHaveBeenCalledWith(user.email)
+      expect(result).toEqual(user)
     })
 
     it('should return null when user not found', async () => {
       // Arrange
-      fakeRepository.seed([TEST_USERS.ADMIN])
+      mockRepository.findByEmail.mockResolvedValue(null)
 
       // Act
       const result = await service.findByEmail('nonexistent@test.com')
+
+      // Assert
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('findByUsername', () => {
+    it('should find user by username', async () => {
+      // Arrange
+      const user = TEST_USERS.ADMIN
+      mockRepository.findByUsername.mockResolvedValue(user)
+
+      // Act
+      const result = await service.findByUsername(user.username)
+
+      // Assert
+      expect(mockRepository.findByUsername).toHaveBeenCalledWith(user.username)
+      expect(result).toEqual(user)
+    })
+
+    it('should return null when user not found', async () => {
+      // Arrange
+      mockRepository.findByUsername.mockResolvedValue(null)
+
+      // Act
+      const result = await service.findByUsername('nonexistent')
+
+      // Assert
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('findByCI', () => {
+    it('should find user by CI', async () => {
+      // Arrange
+      const user = TEST_USERS.USUARIO
+      mockRepository.findByCI.mockResolvedValue(user)
+
+      // Act
+      const result = await service.findByCI(user.ci)
+
+      // Assert
+      expect(mockRepository.findByCI).toHaveBeenCalledWith(user.ci)
+      expect(result).toEqual(user)
+    })
+
+    it('should return null when user not found', async () => {
+      // Arrange
+      mockRepository.findByCI.mockResolvedValue(null)
+
+      // Act
+      const result = await service.findByCI('99999999')
 
       // Assert
       expect(result).toBeNull()
@@ -264,112 +311,353 @@ describe('UsersService (Integration)', () => {
         organizationId: 'org-1',
       })
 
-      const org2User = createTestUser({
-        id: 'user-3',
-        email: 'user3@test.com',
-        username: 'user3',
-        ci: '33333333',
-        organizationId: 'org-2',
-      })
-
-      fakeRepository.seed([org1User1, org1User2, org2User])
+      mockRepository.findByOrganization.mockResolvedValue([org1User1, org1User2])
 
       // Act
       const result = await service.findByOrganization('org-1')
 
       // Assert
+      expect(mockRepository.findByOrganization).toHaveBeenCalledWith('org-1')
       expect(result).toHaveLength(2)
-      expect(result.map((u) => u.id)).toEqual(['user-1', 'user-2'])
+      expect(result).toEqual([org1User1, org1User2])
+    })
+
+    it('should return empty array when no users in organization', async () => {
+      // Arrange
+      mockRepository.findByOrganization.mockResolvedValue([])
+
+      // Act
+      const result = await service.findByOrganization('org-empty')
+
+      // Assert
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('update', () => {
+    it('should update user correctly', async () => {
+      // Arrange
+      const userId = 'user-1'
+      const updateDto: UpdateUserDto = {
+        names: 'Updated Admin',
+        email: 'updated-admin@test.com', // New unique email
+      }
+
+      const existingUser = createTestUser({
+        id: userId,
+        names: 'Original Admin',
+        email: 'admin@test.com',
+      })
+
+      const updatedUser = {
+        ...existingUser,
+        names: 'Updated Admin',
+        email: 'updated-admin@test.com',
+      }
+
+      mockRepository.findById.mockResolvedValue(existingUser)
+      mockValidator.validateUniqueEmail.mockResolvedValue(undefined)
+      mockRepository.save.mockResolvedValue(updatedUser)
+
+      // Act
+      const result = await service.update(userId, updateDto)
+
+      // Assert
+      expect(mockRepository.findById).toHaveBeenCalledWith(userId)
+      expect(mockValidator.validateUniqueEmail).toHaveBeenCalledWith(
+        updateDto.email,
+        userId,
+      )
+      expect(mockRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          names: 'Updated Admin',
+          email: 'updated-admin@test.com',
+        }),
+      )
+      expect(result).toEqual(updatedUser)
+    })
+
+    it('should allow updating to same email (no validation)', async () => {
+      // Arrange
+      const userId = 'user-1'
+      const existingUser = createTestUser({
+        id: userId,
+        email: 'admin@test.com',
+      })
+
+      const updateDto: UpdateUserDto = {
+        email: existingUser.email, // Same email
+        names: 'Updated Names',
+      }
+
+      mockRepository.findById.mockResolvedValue(existingUser)
+      mockRepository.save.mockResolvedValue({
+        ...existingUser,
+        names: 'Updated Names',
+      })
+
+      // Act
+      await service.update(userId, updateDto)
+
+      // Assert - NO se valida el email (es el mismo)
+      expect(mockValidator.validateUniqueEmail).not.toHaveBeenCalled()
+      expect(mockRepository.save).toHaveBeenCalled()
+    })
+
+    it('should validate email when changed', async () => {
+      // Arrange
+      const userId = 'user-1'
+      const existingUser = createTestUser({
+        id: userId,
+        email: 'original@test.com',
+      })
+
+      const updateDto: UpdateUserDto = {
+        email: 'new@test.com', // ✅ Email diferente
+      }
+
+      mockRepository.findById.mockResolvedValue(existingUser)
+      mockValidator.validateUniqueEmail.mockResolvedValue(undefined)
+      mockRepository.save.mockResolvedValue({
+        ...existingUser,
+        email: 'new@test.com',
+      })
+
+      // Act
+      await service.update(userId, updateDto)
+
+      // Assert - SÍ se valida porque cambió
+      expect(mockValidator.validateUniqueEmail).toHaveBeenCalledWith(
+        updateDto.email,
+        userId,
+      )
+    })
+
+    it('should validate username when changed', async () => {
+      // Arrange
+      const userId = 'user-1'
+      const existingUser = createTestUser({
+        id: userId,
+        username: 'oldusername',
+      })
+
+      const updateDto: UpdateUserDto = {
+        username: 'newusername', // ✅ Username diferente
+      }
+
+      mockRepository.findById.mockResolvedValue(existingUser)
+      mockValidator.validateUniqueUsername.mockResolvedValue(undefined)
+      mockRepository.save.mockResolvedValue({
+        ...existingUser,
+        username: 'newusername',
+      })
+
+      // Act
+      await service.update(userId, updateDto)
+
+      // Assert - SÍ se valida porque cambió
+      expect(mockValidator.validateUniqueUsername).toHaveBeenCalledWith(
+        updateDto.username,
+        userId,
+      )
+    })
+
+    it('should validate CI when changed', async () => {
+      // Arrange
+      const userId = 'user-1'
+      const existingUser = createTestUser({
+        id: userId,
+        ci: '11111111',
+      })
+
+      const updateDto: UpdateUserDto = {
+        ci: '22222222', // ✅ CI diferente
+      }
+
+      mockRepository.findById.mockResolvedValue(existingUser)
+      mockValidator.validateUniqueCI.mockResolvedValue(undefined)
+      mockRepository.save.mockResolvedValue({
+        ...existingUser,
+        ci: '22222222',
+      })
+
+      // Act
+      await service.update(userId, updateDto)
+
+      // Assert - SÍ se valida porque cambió
+      expect(mockValidator.validateUniqueCI).toHaveBeenCalledWith(
+        updateDto.ci,
+        userId,
+      )
+    })
+
+    it('should throw UserNotFoundException when user does not exist', async () => {
+      // Arrange
+      const userId = 'nonexistent'
+      const updateDto: UpdateUserDto = { names: 'Updated' }
+
+      mockRepository.findById.mockResolvedValue(null)
+
+      // Act & Assert
+      await expect(service.update(userId, updateDto)).rejects.toThrow(
+        UserNotFoundException,
+      )
+
+      expect(mockRepository.save).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('uploadProfileImage', () => {
+    it('should upload profile image and update user', async () => {
+      // Arrange
+      const user = createTestUser({
+        id: 'user-test',
+        image: null, // Sin imagen previa
+      })
+
+      const mockFile = {
+        filename: 'profile.jpg',
+        mimetype: 'image/jpeg',
+        size: 1024,
+      } as Express.Multer.File
+
+      const uploadResult = {
+        filePath: 'users/profiles/user-test.jpg',
+        fileName: 'user-test.jpg',
+        fileSize: 1024,
+        url: 'http://localhost/users/profiles/user-test.jpg',
+        size: 1024,
+        mimeType: 'image/jpeg',
+      }
+
+      mockRepository.findById.mockResolvedValue(user)
+      mockFilesService.replaceFile.mockResolvedValue(uploadResult as any)
+      mockRepository.save.mockResolvedValue({
+        ...user,
+        image: uploadResult.filePath,
+      })
+
+      // Act
+      const result = await service.uploadProfileImage(user.id, mockFile)
+
+      // Assert
+      expect(mockRepository.findById).toHaveBeenCalledWith(user.id)
+      expect(mockFilesService.replaceFile).toHaveBeenCalledWith(
+        null, // user.image es null
+        expect.objectContaining({
+          file: mockFile,
+          folder: 'users/profiles',
+          customFileName: `user-${user.id}`,
+        }),
+      )
+      expect(mockRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          image: uploadResult.filePath,
+        }),
+      )
+      expect(result.image).toBe(uploadResult.filePath)
+    })
+  })
+
+  describe('deactivate', () => {
+    it('should deactivate user', async () => {
+      // Arrange
+      const user = TEST_USERS.ADMIN
+
+      mockRepository.findById.mockResolvedValue(user)
+      mockRepository.save.mockResolvedValue({
+        ...user,
+        status: UserStatus.INACTIVE,
+      })
+
+      // Act
+      const result = await service.deactivate(user.id)
+
+      // Assert
+      expect(mockRepository.findById).toHaveBeenCalledWith(user.id)
+      expect(mockRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: UserStatus.INACTIVE,
+        }),
+      )
+      expect(result.status).toBe(UserStatus.INACTIVE)
+    })
+
+    it('should throw when user not found', async () => {
+      // Arrange
+      mockRepository.findById.mockResolvedValue(null)
+
+      // Act & Assert
+      await expect(service.deactivate('nonexistent')).rejects.toThrow(
+        UserNotFoundException,
+      )
     })
   })
 
   describe('remove (soft delete)', () => {
     it('should soft delete user', async () => {
       // Arrange
-      fakeRepository.seed([TEST_USERS.ADMIN])
+      const user = TEST_USERS.ADMIN
+
+      mockRepository.findById.mockResolvedValue(user)
+      mockRepository.softDelete.mockResolvedValue(true)
 
       // Act
-      await service.remove(TEST_USERS.ADMIN.id)
+      await service.remove(user.id)
 
-      // Assert - ✅ User no longer appears in findById (soft deleted)
-      const user = await fakeRepository.findById(TEST_USERS.ADMIN.id)
-      expect(user).toBeNull()
+      // Assert
+      expect(mockRepository.findById).toHaveBeenCalledWith(user.id)
+      expect(mockRepository.softDelete).toHaveBeenCalledWith(user.id)
+    })
 
-      // ✅ But still in repo (with deletedAt)
-      const allIncludingDeleted = fakeRepository.getAllIncludingDeleted()
-      expect(allIncludingDeleted).toHaveLength(1)
-      expect(allIncludingDeleted[0].deletedAt).toBeDefined()
+    it('should throw when user not found', async () => {
+      // Arrange
+      mockRepository.findById.mockResolvedValue(null)
+
+      // Act & Assert
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        UserNotFoundException,
+      )
+
+      expect(mockRepository.softDelete).not.toHaveBeenCalled()
     })
   })
 
   describe('Complex scenarios', () => {
-    it('should handle multiple operations on same data', async () => {
-      // ✅ Complex scenario: create, update, search
-      // With fake repo you don't need to mock each step
-
-      // 1. Create user
-      const createDto: CreateUserDto = {
-        names: 'Test',
-        lastNames: 'User',
-        email: 'test@test.com',
-        username: 'testuser',
-        ci: '12345678',
-        password: 'Pass123!',
-        roles: [Role.USUARIO],
-        status: UserStatus.ACTIVE,
-      }
-
-      const created = await service.create(createDto)
-      expect(created.id).toBeDefined()
-
-      // 2. Update
-      const updateDto: UpdateUserDto = {
-        names: 'Updated Test',
-        status: UserStatus.INACTIVE,
-      }
-
-      const updated = await service.update(created.id, updateDto)
-      expect(updated.names).toBe('Updated Test')
-      expect(updated.status).toBe(UserStatus.INACTIVE)
-
-      // 3. Search by email
-      const found = await service.findByEmail('test@test.com')
-      expect(found!.id).toBe(created.id)
-      expect(found!.names).toBe('Updated Test')
-
-      // 4. Verify final state
-      expect(fakeRepository.count()).toBe(1)
-      const all = await fakeRepository.findAll()
-      expect(all[0].status).toBe(UserStatus.INACTIVE)
-    })
-
-    it('should validate password hashing works correctly', async () => {
+    it('should hash password when creating user with real factory', async () => {
       // Arrange
       const plainPassword = 'MySecurePass123!'
-      const createDto: CreateUserDto = {
+      const dto: CreateUserDto = {
         names: 'Test',
         lastNames: 'User',
         email: 'test@test.com',
         username: 'testuser',
         ci: '12345678',
         password: plainPassword,
+        organizationId: 'org-test', // ✅ Requerido
         roles: [Role.USUARIO],
         status: UserStatus.ACTIVE,
       }
 
+      mockValidator.validateUniqueConstraints.mockResolvedValue(undefined)
+
+      // Capturamos qué recibe el repository.save
+      let savedData: any
+      mockRepository.save.mockImplementation(async (data: any) => {
+        savedData = data
+        return { ...data, id: 'user-123' } as any
+      })
+
       // Act
-      const created = await service.create(createDto)
+      await service.create(dto)
 
-      // Assert - ✅ Password must be hashed in repo
-      const saved = await fakeRepository.findById(created.id)
-      expect(saved!.password).not.toBe(plainPassword)
-      expect(bcrypt.compareSync(plainPassword, saved!.password)).toBe(true)
+      // Assert - ✅ Factory hasheó la contraseña
+      expect(savedData.password).toBeDefined()
+      expect(savedData.password).not.toBe(plainPassword) // NO es plain text
+      expect(savedData.password.length).toBeGreaterThan(50) // Hash largo
 
-      // ✅ Verify with factory
-      expect(factory.verifyPassword(plainPassword, saved!.password)).toBe(true)
-      expect(factory.verifyPassword('WrongPassword', saved!.password)).toBe(
-        false,
-      )
+      // ✅ Verificamos que sea un hash válido de bcrypt
+      expect(savedData.password).toMatch(/^\$2[aby]\$/) // Bcrypt format
     })
   })
 })

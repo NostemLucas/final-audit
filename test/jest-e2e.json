@@ -1,0 +1,18 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^@core/(.*)$": "<rootDir>/src/@core/$1",
+    "^@core$": "<rootDir>/src/@core",
+    "^@shared/(.*)$": "<rootDir>/src/@shared/$1",
+    "^@shared$": "<rootDir>/src/@shared"
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(chalk|#ansi-styles|#supports-color)/)"
+  ]
+}

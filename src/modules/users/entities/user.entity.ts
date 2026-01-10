@@ -51,11 +51,11 @@ export class UserEntity extends BaseEntity {
   })
   status: UserStatus
 
-  @Column({ type: 'uuid', nullable: true })
-  organizationId: string | null
+  @Column({ type: 'uuid' })
+  organizationId: string
 
   @ManyToOne(() => OrganizationEntity, {
-    nullable: true,
+    nullable: false,
   })
   @JoinColumn({ name: 'organizationId' })
   organization: OrganizationEntity
