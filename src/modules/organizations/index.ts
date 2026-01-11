@@ -20,7 +20,8 @@ export * from './services/organizations.service'
 export * from './exceptions'
 
 // 4. Repository Token & Interface (para DI en otros módulos - NO implementación)
-export { ORGANIZATION_REPOSITORY } from './repositories'
+// Token defined in tokens.ts and re-exported here
+export { ORGANIZATION_REPOSITORY } from './tokens'
 export type {
   IOrganizationRepository,
   OrganizationFilters,

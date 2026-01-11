@@ -1,17 +1,22 @@
 import { Injectable, Inject } from '@nestjs/common'
 import type { IOrganizationRepository } from '../repositories'
-import { ORGANIZATION_REPOSITORY } from '../repositories'
+import { ORGANIZATION_REPOSITORY } from '../tokens'
 import {
   NameAlreadyExistsException,
   NitAlreadyExistsException,
+  OrganizationHasActiveUsersException,
   OrganizationNotFoundException,
 } from '../exceptions'
+import { USERS_REPOSITORY } from '../../users/tokens'
+import type { IUsersRepository } from '../../users/repositories'
 
 @Injectable()
 export class OrganizationValidator {
   constructor(
     @Inject(ORGANIZATION_REPOSITORY)
     private readonly organizationRepository: IOrganizationRepository,
+    @Inject(USERS_REPOSITORY)
+    private readonly userRepository: IUsersRepository,
   ) {}
 
   async validateUniqueNit(nit: string, excludeId?: string): Promise<void> {
@@ -47,5 +52,14 @@ export class OrganizationValidator {
       this.validateUniqueName(name, excludeId),
       this.validateUniqueNit(nit, excludeId),
     ])
+  }
+
+  async validateCanBeDeactivated(organizationId: string): Promise<void> {
+    const activeUsersCount =
+      await this.userRepository.countUsersByOrganization(organizationId)
+
+    if (activeUsersCount > 0) {
+      throw new OrganizationHasActiveUsersException()
+    }
   }
 }

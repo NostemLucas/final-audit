@@ -5,7 +5,7 @@ import { OrganizationEntity } from '../../entities/organization.entity'
 import { OrganizationValidator } from '../../validators/organization.validator'
 import { OrganizationFactory } from '../../factories/organization.factory'
 import { OrganizationNotFoundException } from '../../exceptions'
-import { ORGANIZATION_REPOSITORY } from '../../repositories'
+import { ORGANIZATION_REPOSITORY } from '../../tokens'
 import type { IOrganizationRepository } from '../../repositories'
 
 /**

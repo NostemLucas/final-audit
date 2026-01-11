@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { UserEntity } from '../../entities/user.entity'
-import { USERS_REPOSITORY } from '../../repositories'
+import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
 
 /**

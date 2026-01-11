@@ -2,17 +2,20 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { OrganizationValidator } from './organization.validator'
 import type { IOrganizationRepository } from '../repositories'
-import { ORGANIZATION_REPOSITORY } from '../repositories'
+import { ORGANIZATION_REPOSITORY } from '../tokens'
 import { OrganizationEntity } from '../entities/organization.entity'
 import {
   NameAlreadyExistsException,
   NitAlreadyExistsException,
   OrganizationNotFoundException,
 } from '../exceptions'
+import { USERS_REPOSITORY } from '../../users/tokens'
+import type { IUsersRepository } from '../../users/repositories'
 
 describe('OrganizationValidator', () => {
   let validator: OrganizationValidator
   let repository: jest.Mocked<IOrganizationRepository>
+  let usersRepository: jest.Mocked<IUsersRepository>
 
   const mockOrganization: OrganizationEntity = {
     id: '1',
@@ -36,6 +39,10 @@ describe('OrganizationValidator', () => {
       findById: jest.fn(),
     }
 
+    const mockUsersRepository: Partial<jest.Mocked<IUsersRepository>> = {
+      countUsersByOrganization: jest.fn(),
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrganizationValidator,
@@ -43,11 +50,16 @@ describe('OrganizationValidator', () => {
           provide: ORGANIZATION_REPOSITORY,
           useValue: mockRepository,
         },
+        {
+          provide: USERS_REPOSITORY,
+          useValue: mockUsersRepository,
+        },
       ],
     }).compile()
 
     validator = module.get<OrganizationValidator>(OrganizationValidator)
     repository = module.get(ORGANIZATION_REPOSITORY)
+    usersRepository = module.get(USERS_REPOSITORY)
   })
 
   afterEach(() => {

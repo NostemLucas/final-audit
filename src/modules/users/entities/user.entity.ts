@@ -1,6 +1,6 @@
-import { OrganizationEntity } from '../../organizations/entities/organization.entity'
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm'
 import { BaseEntity } from '@core/entities/base.entity'
+import { OrganizationEntity } from '../../organizations/entities/organization.entity'
 
 export enum UserStatus {
   ACTIVE = 'active',

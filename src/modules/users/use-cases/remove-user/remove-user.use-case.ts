@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { Transactional } from '@core/database'
 import { UserValidator } from '../../validators/user.validator'
-import { USERS_REPOSITORY } from '../../repositories'
+import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
 
 /**

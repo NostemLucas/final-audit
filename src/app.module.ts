@@ -10,11 +10,13 @@ import { HttpExceptionFilter } from '@core/filters'
 import { LoggingInterceptor } from '@core/interceptors'
 import { databaseConfig } from '@core/config'
 import { FilesModule } from '@core/files'
+import { PersistenceModule } from '@core/persistence'
 import { UsersModule } from './modules/users'
 import { OrganizationsModule } from './modules/organizations'
 
 @Module({
   imports: [
+    // Core modules
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -24,6 +26,9 @@ import { OrganizationsModule } from './modules/organizations'
     FilesModule,
     LoggerModule,
     EmailModule,
+    PersistenceModule,
+
+    // Feature modules
     OrganizationsModule,
     UsersModule,
   ],

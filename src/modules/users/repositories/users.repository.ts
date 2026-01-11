@@ -93,4 +93,10 @@ export class UsersRepository
     const count = await query.getCount()
     return count > 0
   }
+
+  async countUsersByOrganization(organizationId: string): Promise<number> {
+    return await this.getRepo().count({
+      where: { organizationId },
+    })
+  }
 }

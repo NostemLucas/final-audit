@@ -20,7 +20,8 @@ export * from './services/users.service'
 export * from './exceptions'
 
 // 4. Repository Token & Interface (para DI en otros módulos - NO implementación)
-export { USERS_REPOSITORY } from './repositories'
+// Token defined in tokens.ts and re-exported here
+export { USERS_REPOSITORY } from './tokens'
 export type { IUsersRepository } from './repositories'
 
 // ❌ NO exportar aquí (usar imports directos):

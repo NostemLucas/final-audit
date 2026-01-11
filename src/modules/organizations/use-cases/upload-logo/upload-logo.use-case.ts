@@ -3,7 +3,7 @@ import { Transactional } from '@core/database'
 import { FilesService, FileType } from '@core/files'
 import { OrganizationEntity } from '../../entities/organization.entity'
 import { OrganizationNotFoundException } from '../../exceptions'
-import { ORGANIZATION_REPOSITORY } from '../../repositories'
+import { ORGANIZATION_REPOSITORY } from '../../tokens'
 import type { IOrganizationRepository } from '../../repositories'
 
 /**

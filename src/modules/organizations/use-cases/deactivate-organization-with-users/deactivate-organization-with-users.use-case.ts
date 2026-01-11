@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { Transactional } from '@core/database'
 import { OrganizationNotFoundException } from '../../exceptions'
-import { ORGANIZATION_REPOSITORY } from '../../repositories'
+import { ORGANIZATION_REPOSITORY } from '../../tokens'
 import type { IOrganizationRepository } from '../../repositories'
 import { USERS_REPOSITORY } from '../../../users' // ⚠️ Importa token de users
 import type { IUsersRepository } from '../../../users' // ⚠️ Importa interface

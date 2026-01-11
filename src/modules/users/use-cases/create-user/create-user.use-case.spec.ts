@@ -4,7 +4,7 @@ import { UserValidator } from '../../validators/user.validator'
 import { UserFactory } from '../../factories/user.factory'
 import { CreateUserDto } from '../../dtos'
 import { UserEntity, UserStatus, Role } from '../../entities/user.entity'
-import { USERS_REPOSITORY } from '../../repositories'
+import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
 import { createMock } from '@core/testing'
 

@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { Transactional } from '@core/database'
-import { ORGANIZATION_REPOSITORY } from '../../repositories'
+import { ORGANIZATION_REPOSITORY } from '../../tokens'
 import type { IOrganizationRepository } from '../../repositories'
 
 /**

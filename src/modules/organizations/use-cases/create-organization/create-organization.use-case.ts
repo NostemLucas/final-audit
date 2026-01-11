@@ -4,7 +4,7 @@ import { CreateOrganizationDto } from '../../dtos'
 import { OrganizationEntity } from '../../entities/organization.entity'
 import { OrganizationValidator } from '../../validators/organization.validator'
 import { OrganizationFactory } from '../../factories/organization.factory'
-import { ORGANIZATION_REPOSITORY } from '../../repositories'
+import { ORGANIZATION_REPOSITORY } from '../../tokens'
 import type { IOrganizationRepository } from '../../repositories'
 
 /**

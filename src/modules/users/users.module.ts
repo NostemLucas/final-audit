@@ -1,13 +1,8 @@
 import { Module } from '@nestjs/common'
-import { TypeOrmModule } from '@nestjs/typeorm'
-import { UserEntity } from './entities/user.entity'
 import { UsersController } from './controllers/users.controller'
 import { UsersService } from './services/users.service'
-import { UsersRepository } from './repositories/users.repository'
-import { USERS_REPOSITORY } from './repositories'
 import { UserValidator } from './validators/user.validator'
 import { UserFactory } from './factories/user.factory'
-import { OrganizationsModule } from '../organizations/organizations.module'
 import {
   CreateUserUseCase,
   UpdateUserUseCase,
@@ -22,8 +17,26 @@ import {
   RemoveUserUseCase,
 } from './use-cases'
 
+/**
+ * Módulo de Usuarios (Simplificado con PersistenceModule)
+ *
+ * ✅ Ya NO necesita:
+ * - Importar TypeOrmModule.forFeature([UserEntity])
+ * - Importar OrganizationsModule
+ * - Proveer USERS_REPOSITORY
+ * - Exportar USERS_REPOSITORY
+ *
+ * 🎯 Responsabilidades:
+ * - Controladores
+ * - Servicios
+ * - Use Cases
+ * - Validadores
+ * - Factories
+ *
+ * 📦 Los repositorios vienen de PersistenceModule (global)
+ */
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity]), OrganizationsModule],
+  imports: [],
   controllers: [UsersController],
   providers: [
     // Service (facade)
@@ -45,11 +58,7 @@ import {
     // Infrastructure
     UserValidator,
     UserFactory,
-    {
-      provide: USERS_REPOSITORY,
-      useClass: UsersRepository,
-    },
   ],
-  exports: [USERS_REPOSITORY],
+  exports: [],
 })
 export class UsersModule {}

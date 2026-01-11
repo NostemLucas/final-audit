@@ -8,7 +8,7 @@ import { FilesService } from '@core/files'
 import { createMock } from '@core/testing'
 import { TEST_USERS, createTestUser } from '../__tests__/fixtures/user.fixtures'
 import type { IUsersRepository } from '../repositories'
-import { USERS_REPOSITORY } from '../repositories'
+import { USERS_REPOSITORY } from '../tokens'
 import { Role, UserStatus } from '../entities/user.entity'
 
 /**

@@ -5,7 +5,7 @@ import { UserFactory } from '../../factories/user.factory'
 import { UpdateUserDto } from '../../dtos'
 import { UserEntity, UserStatus, Role } from '../../entities/user.entity'
 import { UserNotFoundException } from '../../exceptions'
-import { USERS_REPOSITORY } from '../../repositories'
+import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
 import { createMock } from '@core/testing'
 

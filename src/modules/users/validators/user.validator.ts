@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common'
-import { USERS_REPOSITORY } from '../repositories'
+import { USERS_REPOSITORY } from '../tokens'
 import type { IUsersRepository } from '../repositories'
 import {
   EmailAlreadyExistsException,
@@ -8,8 +8,8 @@ import {
   UserNotFoundException,
   OrganizationNotFoundForUserException,
 } from '../exceptions'
-import { ORGANIZATION_REPOSITORY } from '../../organizations'
-import type { IOrganizationRepository } from '../../organizations'
+import { ORGANIZATION_REPOSITORY } from '../../organizations/tokens'
+import type { IOrganizationRepository } from '../../organizations/repositories'
 
 /**
  * Servicio de validación de reglas de negocio para usuarios

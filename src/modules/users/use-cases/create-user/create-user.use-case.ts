@@ -4,7 +4,7 @@ import { CreateUserDto } from '../../dtos'
 import { UserEntity } from '../../entities/user.entity'
 import { UserValidator } from '../../validators/user.validator'
 import { UserFactory } from '../../factories/user.factory'
-import { USERS_REPOSITORY } from '../../repositories'
+import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
 
 /**

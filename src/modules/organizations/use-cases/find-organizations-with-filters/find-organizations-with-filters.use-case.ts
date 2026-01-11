@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common'
 import { PaginatedResponse, PaginatedResponseBuilder } from '@core/dtos'
 import { OrganizationEntity } from '../../entities/organization.entity'
 import { FindOrganizationsDto } from '../../dtos'
-import { ORGANIZATION_REPOSITORY } from '../../repositories'
+import { ORGANIZATION_REPOSITORY } from '../../tokens'
 import type {
   IOrganizationRepository,
   OrganizationFilters,

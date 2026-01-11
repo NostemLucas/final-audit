@@ -7,19 +7,22 @@ import {
   UserNotFoundException,
 } from '../exceptions'
 import type { IUsersRepository } from '../repositories'
-import { USERS_REPOSITORY } from '../repositories'
+import { USERS_REPOSITORY } from '../tokens'
+import type { IOrganizationRepository } from '../../organizations'
+import { ORGANIZATION_REPOSITORY } from '../../organizations'
 import { createMock } from '@core/testing'
 
 /**
- * ✅ UNIT TESTS - UserValidator
+ * ✅ UNIT TESTS - UserValidator (con PersistenceModule)
  *
  * Testing approach:
- * - Mock Repository: Mockeamos solo existsByEmail, existsByUsername, existsByCI, findById
+ * - Mock USERS_REPOSITORY y ORGANIZATION_REPOSITORY
  * - Enfoque: Probar lógica de validación y que se lancen las excepciones correctas
  */
 describe('UserValidator', () => {
   let validator: UserValidator
   let mockRepository: jest.Mocked<IUsersRepository>
+  let mockOrganizationRepository: jest.Mocked<IOrganizationRepository>
 
   beforeEach(async () => {
     mockRepository = createMock<IUsersRepository>({
@@ -29,12 +32,20 @@ describe('UserValidator', () => {
       findById: jest.fn(),
     })
 
+    mockOrganizationRepository = createMock<IOrganizationRepository>({
+      existsActiveById: jest.fn(),
+    })
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserValidator,
         {
           provide: USERS_REPOSITORY,
           useValue: mockRepository,
+        },
+        {
+          provide: ORGANIZATION_REPOSITORY,
+          useValue: mockOrganizationRepository,
         },
       ],
     }).compile()

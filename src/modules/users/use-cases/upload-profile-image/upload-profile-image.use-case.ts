@@ -3,7 +3,7 @@ import { Transactional } from '@core/database'
 import { FilesService, FileType } from '@core/files'
 import { UserEntity } from '../../entities/user.entity'
 import { UserNotFoundException } from '../../exceptions'
-import { USERS_REPOSITORY } from '../../repositories'
+import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
 
 /**

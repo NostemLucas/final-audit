@@ -9,4 +9,5 @@ export interface IUsersRepository extends IBaseRepository<UserEntity> {
   existsByEmail(email: string, excludeId?: string): Promise<boolean>
   existsByUsername(username: string, excludeId?: string): Promise<boolean>
   existsByCI(ci: string, excludeId?: string): Promise<boolean>
+  countUsersByOrganization(organizationId: string): Promise<number>
 }
