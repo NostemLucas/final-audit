@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common'
 import request from 'supertest'
 import { AppModule } from '../src/app.module'
 import { DataSource } from 'typeorm'
+import { CreateOrganizationDto } from 'src/modules/organizations/dtos'
 
 /**
  * ✅ E2E TESTS - Organizations Controller
@@ -61,7 +62,7 @@ describe('OrganizationsController (E2E)', () => {
   describe('POST /organizations', () => {
     it('should create a new organization with valid data', async () => {
       // Arrange
-      const createDto = {
+      const createDto: CreateOrganizationDto = {
         name: 'Test Organization E2E',
         nit: '9999999999',
         description: 'E2E Test Description',

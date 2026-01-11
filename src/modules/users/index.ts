@@ -1,31 +1,33 @@
 /**
  * API Pública del módulo Users
  *
- * ✅ EXPONER: Module, Entity, DTOs, Service, Exceptions
- * ❌ NO EXPONER: Repository, Factory, Validator, Controller
+ * REGLAS:
+ * ✅ SÍ exportar: Module, Service (si se usa fuera), Exceptions, Repository Token/Interface
+ * ❌ NO exportar: Entity (import directo para evitar circular deps), DTOs (internos), Implementations
+ *
+ * IMPORTANTE:
+ * - Entity: NO exportar aquí. Usar import directo: '../users/entities/user.entity'
+ * - Esto evita circular dependencies cuando otros módulos usan la entidad
  */
 
-// 1. Module (SIEMPRE - para importar en AppModule)
+// 1. Module (para importar en AppModule)
 export * from './users.module'
 
-// 2. Entity (para tipos en otros módulos)
-export * from './entities/user.entity'
-
-// 3. DTOs (si otros módulos los usan - ej: auth module)
-export * from './dtos'
-
-// 4. Service (si otros módulos lo necesitan - ej: auth module)
+// 2. Service (si otros módulos lo necesitan - ej: auth module)
 export * from './services/users.service'
 
-// 5. Exceptions (para manejo de errores en otros módulos)
+// 3. Exceptions (para manejo de errores en otros módulos)
 export * from './exceptions'
 
-// 6. Repository Token & Interface (para DI en otros módulos - NO implementación)
+// 4. Repository Token & Interface (para DI en otros módulos - NO implementación)
 export { USERS_REPOSITORY } from './repositories'
 export type { IUsersRepository } from './repositories'
 
-// ❌ NO exportar:
-// - Repository implementation (implementación privada del módulo)
-// - Factory (implementación privada del módulo)
-// - Validator (implementación privada del módulo)
+// ❌ NO exportar aquí (usar imports directos):
+// - Entity → import { UserEntity } from '../users/entities/user.entity'
+// - DTOs (privados del módulo, solo se usan internamente)
+// - Repository implementation (implementación privada)
+// - Factory (implementación privada)
+// - Validator (implementación privada)
+// - Use Cases (privados, llamados desde service)
 // - Controller (NestJS lo maneja automáticamente)

@@ -160,7 +160,7 @@ describe('CreateUserUseCase', () => {
 
     it('should call validations in parallel', async () => {
       // Arrange
-      let validationOrder: string[] = []
+      const validationOrder: string[] = []
 
       mockValidator.validateUniqueConstraints.mockImplementation(async () => {
         validationOrder.push('unique')

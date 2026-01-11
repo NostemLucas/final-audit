@@ -15,8 +15,7 @@ export class FindOrganizationByNitUseCase {
   ) {}
 
   async execute(nit: string): Promise<OrganizationEntity> {
-    const organization =
-      await this.organizationRepository.findActiveByNit(nit)
+    const organization = await this.organizationRepository.findActiveByNit(nit)
 
     if (!organization) {
       throw new OrganizationNotFoundException(nit, 'NIT')

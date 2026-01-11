@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { LoggerService } from '@core/logger'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
@@ -12,15 +13,33 @@ import {
 
 /**
  * Implementación de almacenamiento local
- * Guarda archivos en el sistema de archivos del servidor
+ *
+ * Características:
+ * - Guarda archivos en sistema de archivos local
+ * - Soporta directorios anidados (ej: uploads/users/avatars)
+ * - Crea directorios automáticamente si no existen
+ * - Genera nombres únicos con UUID
+ * - Limpia carpetas vacías al eliminar archivos
+ * - Usa LoggerService del proyecto para logging consistente
+ *
+ * Estructura de directorios:
+ * uploads/
+ *   ├── users/
+ *   │   ├── avatars/
+ *   │   └── documents/
+ *   ├── organizations/
+ *   │   └── logos/
+ *   └── temp/
  */
 @Injectable()
 export class LocalStorageService implements IStorageService {
-  private readonly logger = new Logger(LocalStorageService.name)
   private readonly uploadsDir: string
   private readonly baseUrl: string
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly logger: LoggerService,
+  ) {
     // Directorio raíz para uploads (por defecto: ./uploads)
     this.uploadsDir =
       this.configService.get<string>('UPLOADS_DIR') ||
@@ -28,7 +47,7 @@ export class LocalStorageService implements IStorageService {
 
     // URL base para acceder a los archivos
     const appUrl =
-      this.configService.get<string>('APP_URL') || 'http://localhost:3000'
+      this.configService.get<string>('APP_URL') || 'http://localhost:3001'
     this.baseUrl = `${appUrl}/uploads`
 
     // Crear directorio de uploads si no existe
@@ -41,39 +60,54 @@ export class LocalStorageService implements IStorageService {
 
   /**
    * Guarda un archivo en el sistema local
+   *
+   * Soporta directorios anidados:
+   * - folder: 'users/avatars' → uploads/users/avatars/
+   * - folder: 'organizations/org-123/documents' → uploads/organizations/org-123/documents/
+   *
+   * @throws Error si no se puede guardar el archivo
    */
   async saveFile(options: SaveFileOptions): Promise<SaveFileResult> {
+    const startTime = Date.now()
+
     try {
-      // 1. Generar nombre de archivo único
+      // 1. Validar y normalizar folder path
+      const normalizedFolder = this.normalizeFolderPath(options.folder)
+
+      // 2. Generar nombre de archivo único
       const fileName = this.generateFileName(
         options.originalName,
         options.customFileName,
       )
 
-      // 2. Crear path completo
-      const folderPath = path.join(this.uploadsDir, options.folder)
-      const filePath = path.join(options.folder, fileName)
+      // 3. Construir paths
+      const folderPath = path.join(this.uploadsDir, normalizedFolder)
+      const filePath = path.join(normalizedFolder, fileName)
       const fullPath = path.join(this.uploadsDir, filePath)
 
-      // 3. Verificar si el archivo ya existe
+      // 4. Verificar si el archivo ya existe
       if (!options.overwrite) {
         const exists = await this.fileExists(filePath)
         if (exists) {
           throw new Error(
-            `El archivo ${fileName} ya existe en ${options.folder}`,
+            `El archivo ${fileName} ya existe en ${normalizedFolder}`,
           )
         }
       }
 
-      // 4. Crear carpeta si no existe
-      await fs.mkdir(folderPath, { recursive: true })
+      // 5. Crear toda la estructura de carpetas (subdirectorios anidados)
+      await this.ensureDirectoryExists(folderPath)
 
-      // 5. Guardar archivo
+      // 6. Guardar archivo
       await fs.writeFile(fullPath, options.buffer)
 
-      this.logger.log(`Archivo guardado: ${filePath}`)
+      const duration = Date.now() - startTime
 
-      // 6. Retornar resultado
+      this.logger.log(
+        `Archivo guardado: ${filePath} (${options.buffer.length} bytes, ${duration}ms)`,
+      )
+
+      // 7. Retornar resultado
       return {
         fileName,
         filePath,
@@ -82,7 +116,10 @@ export class LocalStorageService implements IStorageService {
         mimeType: options.mimeType,
       }
     } catch (error) {
-      this.logger.error(`Error guardando archivo: ${error}`)
+      this.logger.error(
+        `Error guardando archivo ${options.originalName} en ${options.folder}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+
       throw new Error(
         `Error al guardar archivo: ${error instanceof Error ? error.message : 'Unknown error'}`,
       )
@@ -91,6 +128,7 @@ export class LocalStorageService implements IStorageService {
 
   /**
    * Elimina un archivo del sistema local
+   * También intenta limpiar carpetas vacías recursivamente
    */
   async deleteFile(options: DeleteFileOptions): Promise<void> {
     try {
@@ -110,11 +148,14 @@ export class LocalStorageService implements IStorageService {
 
       this.logger.log(`Archivo eliminado: ${options.filePath}`)
 
-      // Intentar eliminar carpeta si está vacía
+      // Intentar eliminar carpetas vacías recursivamente
       const folderPath = path.dirname(fullPath)
-      await this.removeEmptyFolder(folderPath)
+      await this.removeEmptyFolders(folderPath)
     } catch (error) {
-      this.logger.error(`Error eliminando archivo: ${error}`)
+      this.logger.error(
+        `Error eliminando archivo ${options.filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+
       throw new Error(
         `Error al eliminar archivo: ${error instanceof Error ? error.message : 'Unknown error'}`,
       )
@@ -138,13 +179,17 @@ export class LocalStorageService implements IStorageService {
    * Obtiene la URL pública de un archivo
    */
   getFileUrl(filePath: string): string {
-    // Normalizar separadores de path para URLs
+    // Normalizar separadores de path para URLs (Windows → Linux)
     const normalizedPath = filePath.replace(/\\/g, '/')
     return `${this.baseUrl}/${normalizedPath}`
   }
 
   /**
    * Genera un nombre de archivo único
+   *
+   * @param originalName Nombre original del archivo
+   * @param customFileName Nombre personalizado (opcional)
+   * @returns Nombre de archivo con extensión
    */
   private generateFileName(
     originalName: string,
@@ -158,8 +203,11 @@ export class LocalStorageService implements IStorageService {
       return `${sanitized}${extension}`
     }
 
-    // Generar nombre único con UUID
-    const uniqueName = `${uuidv4()}${extension}`
+    // Generar nombre único con UUID + timestamp para evitar colisiones
+    const timestamp = Date.now()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const uuid: string = uuidv4()
+    const uniqueName = `${uuid}-${timestamp}${extension}`
     return uniqueName
   }
 
@@ -168,7 +216,11 @@ export class LocalStorageService implements IStorageService {
    */
   private getFileExtension(filename: string): string {
     const parts = filename.split('.')
-    return parts.length > 1 ? `.${parts.pop()}` : ''
+    if (parts.length > 1) {
+      const extension = parts.pop()
+      return extension ? `.${extension.toLowerCase()}` : ''
+    }
+    return ''
   }
 
   /**
@@ -182,6 +234,29 @@ export class LocalStorageService implements IStorageService {
       .replace(/[^a-z0-9-_.]/g, '') // Solo alfanuméricos, guiones, puntos, underscores
       .replace(/-+/g, '-') // Múltiples guiones a uno solo
       .replace(/^-|-$/g, '') // Remover guiones al inicio/fin
+      .substring(0, 100) // Limitar longitud
+  }
+
+  /**
+   * Normaliza un folder path
+   * Remueve '..' y '.' para prevenir directory traversal
+   *
+   * @example
+   * 'users/avatars' → 'users/avatars'
+   * 'users/../../../etc/passwd' → 'users/etc/passwd'
+   * './users/./avatars' → 'users/avatars'
+   */
+  private normalizeFolderPath(folder: string): string {
+    // Normalizar separadores
+    const normalized = folder.replace(/\\/g, '/')
+
+    // Separar en partes y filtrar '..' y '.'
+    const parts = normalized
+      .split('/')
+      .filter((part) => part && part !== '.' && part !== '..')
+
+    // Reconstruir path seguro
+    return parts.join('/')
   }
 
   /**
@@ -197,27 +272,54 @@ export class LocalStorageService implements IStorageService {
   }
 
   /**
-   * Elimina una carpeta si está vacía
+   * Crea un directorio y todos sus padres si no existen
+   * Soporta directorios anidados: uploads/users/avatars/profile
    */
-  private async removeEmptyFolder(folderPath: string): Promise<void> {
+  private async ensureDirectoryExists(dirPath: string): Promise<void> {
+    try {
+      await fs.mkdir(dirPath, { recursive: true })
+    } catch (error) {
+      this.logger.error(
+        `Error creando directorio ${dirPath}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Elimina carpetas vacías recursivamente
+   * Se detiene al llegar al directorio raíz de uploads
+   *
+   * Útil para mantener limpia la estructura de directorios
+   * cuando se eliminan archivos
+   */
+  private async removeEmptyFolders(folderPath: string): Promise<void> {
     try {
       // No eliminar el directorio raíz de uploads
       if (folderPath === this.uploadsDir) {
         return
       }
 
+      // No eliminar si no está dentro de uploads (seguridad)
+      if (!folderPath.startsWith(this.uploadsDir)) {
+        return
+      }
+
+      // Verificar si la carpeta está vacía
       const files = await fs.readdir(folderPath)
 
       if (files.length === 0) {
         await fs.rmdir(folderPath)
-        this.logger.log(`Carpeta vacía eliminada: ${folderPath}`)
+
+        this.logger.debug(`Carpeta vacía eliminada: ${folderPath}`)
 
         // Intentar eliminar carpeta padre si también está vacía
         const parentFolder = path.dirname(folderPath)
-        await this.removeEmptyFolder(parentFolder)
+        await this.removeEmptyFolders(parentFolder)
       }
     } catch {
       // Ignorar errores al intentar eliminar carpetas
+      // (pueden estar en uso, tener permisos diferentes, etc.)
     }
   }
 }

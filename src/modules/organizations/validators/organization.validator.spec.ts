@@ -1,11 +1,13 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing'
 import { OrganizationValidator } from './organization.validator'
 import type { IOrganizationRepository } from '../repositories'
 import { ORGANIZATION_REPOSITORY } from '../repositories'
 import { OrganizationEntity } from '../entities/organization.entity'
 import {
-  DuplicateOrganizationNameException,
-  DuplicateOrganizationNitException,
+  NameAlreadyExistsException,
+  NitAlreadyExistsException,
+  OrganizationNotFoundException,
 } from '../exceptions'
 
 describe('OrganizationValidator', () => {
@@ -24,13 +26,14 @@ describe('OrganizationValidator', () => {
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
-    deletedAt: null,
-  } as OrganizationEntity
+    users: [],
+  }
 
   beforeEach(async () => {
     const mockRepository: Partial<jest.Mocked<IOrganizationRepository>> = {
       findByNit: jest.fn(),
       findByName: jest.fn(),
+      findById: jest.fn(),
     }
 
     const module: TestingModule = await Test.createTestingModule({
@@ -60,16 +63,17 @@ describe('OrganizationValidator', () => {
       await expect(
         validator.validateUniqueNit('999999999'),
       ).resolves.not.toThrow()
+
       expect(repository.findByNit).toHaveBeenCalledWith('999999999')
     })
 
-    it('should throw DuplicateOrganizationNitException when NIT already exists', async () => {
+    it('should throw NitAlreadyExistsException when NIT already exists', async () => {
       // Arrange
       repository.findByNit.mockResolvedValue(mockOrganization)
 
       // Act & Assert
       await expect(validator.validateUniqueNit('123456789')).rejects.toThrow(
-        new DuplicateOrganizationNitException('123456789'),
+        new NitAlreadyExistsException('123456789'),
       )
     })
 
@@ -83,14 +87,14 @@ describe('OrganizationValidator', () => {
       ).resolves.not.toThrow()
     })
 
-    it('should throw DuplicateOrganizationNitException when NIT exists and excludeId is different', async () => {
+    it('should throw NitAlreadyExistsException when NIT exists and excludeId is different', async () => {
       // Arrange
       repository.findByNit.mockResolvedValue(mockOrganization)
 
       // Act & Assert
       await expect(
         validator.validateUniqueNit('123456789', '2'),
-      ).rejects.toThrow(DuplicateOrganizationNitException)
+      ).rejects.toThrow(NitAlreadyExistsException)
     })
   })
 
@@ -106,16 +110,14 @@ describe('OrganizationValidator', () => {
       expect(repository.findByName).toHaveBeenCalledWith('New Organization')
     })
 
-    it('should throw DuplicateOrganizationNameException when name already exists', async () => {
+    it('should throw NameAlreadyExistsException when name already exists', async () => {
       // Arrange
       repository.findByName.mockResolvedValue(mockOrganization)
 
       // Act & Assert
       await expect(
         validator.validateUniqueName('Test Organization'),
-      ).rejects.toThrow(
-        new DuplicateOrganizationNameException('Test Organization'),
-      )
+      ).rejects.toThrow(new NameAlreadyExistsException('Test Organization'))
     })
 
     it('should pass validation when name exists but belongs to the same organization (excludeId)', async () => {
@@ -128,14 +130,36 @@ describe('OrganizationValidator', () => {
       ).resolves.not.toThrow()
     })
 
-    it('should throw DuplicateOrganizationNameException when name exists and excludeId is different', async () => {
+    it('should throw NameAlreadyExistsException when name exists and excludeId is different', async () => {
       // Arrange
       repository.findByName.mockResolvedValue(mockOrganization)
 
       // Act & Assert
       await expect(
         validator.validateUniqueName('Test Organization', '2'),
-      ).rejects.toThrow(DuplicateOrganizationNameException)
+      ).rejects.toThrow(NameAlreadyExistsException)
+    })
+  })
+
+  describe('ensureOrganizationExists', () => {
+    it('should pass when organization exists', async () => {
+      // Arrange
+      repository.findById.mockResolvedValue(mockOrganization)
+      // Act & Assert
+      await expect(
+        validator.ensureOrganizationExists('1'),
+      ).resolves.not.toThrow()
+
+      expect(repository.findById).toHaveBeenCalledWith('1')
+    })
+    it('should throw OrganizationNotFoundException when organization does not exist', async () => {
+      // Arrange
+      repository.findById.mockResolvedValue(null)
+
+      // Act & Assert
+      await expect(validator.ensureOrganizationExists('2')).rejects.toThrow(
+        OrganizationNotFoundException,
+      )
     })
   })
 
@@ -153,7 +177,7 @@ describe('OrganizationValidator', () => {
       expect(repository.findByNit).toHaveBeenCalledWith('999999999')
     })
 
-    it('should throw DuplicateOrganizationNameException when name validation fails', async () => {
+    it('should throw NameAlreadyExistsException when name validation fails', async () => {
       // Arrange
       repository.findByName.mockResolvedValue(mockOrganization)
       repository.findByNit.mockResolvedValue(null)
@@ -161,10 +185,10 @@ describe('OrganizationValidator', () => {
       // Act & Assert
       await expect(
         validator.validateUniqueConstraints('Test Organization', '999999999'),
-      ).rejects.toThrow(DuplicateOrganizationNameException)
+      ).rejects.toThrow(NameAlreadyExistsException)
     })
 
-    it('should throw DuplicateOrganizationNitException when NIT validation fails', async () => {
+    it('should throw NitAlreadyExistsException when NIT validation fails', async () => {
       // Arrange
       repository.findByName.mockResolvedValue(null)
       repository.findByNit.mockResolvedValue(mockOrganization)
@@ -172,7 +196,7 @@ describe('OrganizationValidator', () => {
       // Act & Assert
       await expect(
         validator.validateUniqueConstraints('New Org', '123456789'),
-      ).rejects.toThrow(DuplicateOrganizationNitException)
+      ).rejects.toThrow(NitAlreadyExistsException)
     })
 
     it('should pass validation with excludeId for both constraints', async () => {

@@ -117,7 +117,8 @@ export class CreateUserDto {
   address?: string
 
   @ApiProperty({
-    description: 'ID de la organización a la que pertenece el usuario (requerido)',
+    description:
+      'ID de la organización a la que pertenece el usuario (requerido)',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @IsUUID('4', { message: 'El ID de organización debe ser un UUID válido' })

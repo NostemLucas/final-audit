@@ -6,10 +6,7 @@ import { CreateUserDto, UpdateUserDto } from '../dtos'
 import { UserNotFoundException } from '../exceptions'
 import { FilesService } from '@core/files'
 import { createMock } from '@core/testing'
-import {
-  TEST_USERS,
-  createTestUser,
-} from '../__tests__/fixtures/user.fixtures'
+import { TEST_USERS, createTestUser } from '../__tests__/fixtures/user.fixtures'
 import type { IUsersRepository } from '../repositories'
 import { USERS_REPOSITORY } from '../repositories'
 import { Role, UserStatus } from '../entities/user.entity'
@@ -311,7 +308,10 @@ describe('UsersService', () => {
         organizationId: 'org-1',
       })
 
-      mockRepository.findByOrganization.mockResolvedValue([org1User1, org1User2])
+      mockRepository.findByOrganization.mockResolvedValue([
+        org1User1,
+        org1User2,
+      ])
 
       // Act
       const result = await service.findByOrganization('org-1')
@@ -645,7 +645,7 @@ describe('UsersService', () => {
       let savedData: any
       mockRepository.save.mockImplementation(async (data: any) => {
         savedData = data
-        return { ...data, id: 'user-123' } as any
+        return { ...data, id: 'user-123' }
       })
 
       // Act

@@ -24,10 +24,7 @@ export class UploadProfileImageUseCase {
   ) {}
 
   @Transactional()
-  async execute(
-    id: string,
-    file: Express.Multer.File,
-  ): Promise<UserEntity> {
+  async execute(id: string, file: Express.Multer.File): Promise<UserEntity> {
     // 1. Verificar que el usuario existe
     const user = await this.usersRepository.findById(id)
     if (!user) {

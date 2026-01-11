@@ -3,7 +3,10 @@ import { PaginatedResponse, PaginatedResponseBuilder } from '@core/dtos'
 import { OrganizationEntity } from '../../entities/organization.entity'
 import { FindOrganizationsDto } from '../../dtos'
 import { ORGANIZATION_REPOSITORY } from '../../repositories'
-import type { IOrganizationRepository, OrganizationFilters } from '../../repositories'
+import type {
+  IOrganizationRepository,
+  OrganizationFilters,
+} from '../../repositories'
 
 /**
  * Caso de uso: Buscar organizaciones con filtros y paginación

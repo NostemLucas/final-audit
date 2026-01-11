@@ -19,12 +19,12 @@ describe('OrganizationFactory', () => {
     it('should create organization entity with normalized data', () => {
       // Arrange
       const dto: CreateOrganizationDto = {
-        name: '  test   organization  ', // Espacios extra
+        name: '  test   organization  ',
         nit: '123 456 789',
         description: '  Test description  ',
         address: 'Test address',
         phone: '1234567',
-        email: 'TEST@test.com', // Mayúsculas
+        email: 'TEST@test.com',
       }
 
       // Act
@@ -62,7 +62,7 @@ describe('OrganizationFactory', () => {
       // Arrange
       const dto: CreateOrganizationDto = {
         name: 'Test Org',
-        nit: '123-456  789@#', // Espacios, guiones, caracteres especiales
+        nit: '123-456  789@#',
         description: 'Test',
         address: 'Test',
         phone: '123',
@@ -73,7 +73,7 @@ describe('OrganizationFactory', () => {
       const result = factory.createFromDto(dto)
 
       // Assert
-      expect(result.nit).toBe('123-456789') // Mantiene guiones, elimina espacios y @#
+      expect(result.nit).toBe('123-456789')
     })
 
     it('should normalize NIT to uppercase', () => {

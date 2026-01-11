@@ -120,7 +120,7 @@ export class FilesService {
     if (oldFilePath) {
       try {
         await this.deleteFile(oldFilePath)
-      } catch (_error) {
+      } catch {
         // Ignorar error si el archivo antiguo no existe
         console.warn(`No se pudo eliminar archivo antiguo: ${oldFilePath}`)
       }

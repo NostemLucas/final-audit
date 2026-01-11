@@ -3,7 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { UserEntity } from './entities/user.entity'
 import { UsersController } from './controllers/users.controller'
 import { UsersService } from './services/users.service'
-import { UsersRepository, USERS_REPOSITORY } from './repositories'
+import { UsersRepository } from './repositories/users.repository'
+import { USERS_REPOSITORY } from './repositories'
 import { UserValidator } from './validators/user.validator'
 import { UserFactory } from './factories/user.factory'
 import { OrganizationsModule } from '../organizations/organizations.module'
@@ -49,9 +50,6 @@ import {
       useClass: UsersRepository,
     },
   ],
-  exports: [
-    UsersService,
-    TypeOrmModule, // Para que otros módulos puedan acceder a UserEntity
-  ],
+  exports: [USERS_REPOSITORY],
 })
 export class UsersModule {}

@@ -253,7 +253,11 @@ describe('UserValidator', () => {
 
       // Act & Assert
       await expect(
-        validator.validateUniqueConstraints('email@test.com', 'username', '12345678'),
+        validator.validateUniqueConstraints(
+          'email@test.com',
+          'username',
+          '12345678',
+        ),
       ).rejects.toThrow(CiAlreadyExistsException)
     })
 
@@ -315,7 +319,9 @@ describe('UserValidator', () => {
       } as any)
 
       // Act & Assert
-      await expect(validator.ensureUserExists('user-123')).resolves.not.toThrow()
+      await expect(
+        validator.ensureUserExists('user-123'),
+      ).resolves.not.toThrow()
 
       expect(mockRepository.findById).toHaveBeenCalledWith('user-123')
     })

@@ -3,7 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { OrganizationEntity } from './entities/organization.entity'
 import { OrganizationsController } from './controllers/organizations.controller'
 import { OrganizationsService } from './services/organizations.service'
-import { OrganizationRepository, ORGANIZATION_REPOSITORY } from './repositories'
+import { OrganizationRepository } from './repositories/organization.repository'
+import { ORGANIZATION_REPOSITORY } from './repositories'
 import { OrganizationValidator } from './validators/organization.validator'
 import { OrganizationFactory } from './factories/organization.factory'
 import {
@@ -17,9 +18,10 @@ import {
   RemoveOrganizationUseCase,
   DeleteOrganizationUseCase,
 } from './use-cases'
+import { UsersModule } from '../users'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([OrganizationEntity])],
+  imports: [TypeOrmModule.forFeature([OrganizationEntity]), UsersModule],
   controllers: [OrganizationsController],
   providers: [
     // Service (facade)
@@ -44,10 +46,6 @@ import {
       useClass: OrganizationRepository,
     },
   ],
-  exports: [
-    OrganizationsService,
-    ORGANIZATION_REPOSITORY, // Exportar para que otros módulos puedan inyectarlo
-    TypeOrmModule,
-  ],
+  exports: [ORGANIZATION_REPOSITORY],
 })
 export class OrganizationsModule {}

@@ -7,9 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm'
  * - organizationId ahora es requerido (NOT NULL)
  * - Asigna una organización por defecto a usuarios sin organización (si existen)
  */
-export class MakeOrganizationIdRequired1704844800000
-  implements MigrationInterface
-{
+export class MakeOrganizationIdRequired1704844800000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Primero, obtener la primera organización como fallback
     // (En caso de que haya usuarios sin organizationId)
