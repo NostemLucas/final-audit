@@ -2,6 +2,7 @@ import { runSeeders } from 'typeorm-extension'
 import dataSource from '../config/data-source'
 import OrganizationsSeeder from './01-organizations.seeder'
 import UsersSeeder from './02-users.seeder'
+import PermissionsSeeder from './03-permissions.seeder'
 
 async function runAllSeeds() {
   try {
@@ -11,11 +12,15 @@ async function runAllSeeds() {
     console.log('')
 
     // Ejecutar seeders en orden
-    // IMPORTANTE: El orden importa - organizaciones antes que usuarios
+    // IMPORTANTE: El orden importa
+    // 1. Organizaciones primero
+    // 2. Usuarios (requieren organizaciones)
+    // 3. Permisos (sistema de autorización)
     await runSeeders(dataSource, {
       seeds: [
         OrganizationsSeeder, // 1. Crear organizaciones primero
         UsersSeeder, // 2. Crear usuarios (requieren organizaciones)
+        PermissionsSeeder, // 3. Cargar permisos de Casbin
       ],
     })
 

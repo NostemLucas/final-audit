@@ -28,7 +28,10 @@ export class JwtRefreshStrategy extends PassportStrategy(
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_REFRESH_SECRET', 'your-different-refresh-secret-change-in-production'),
+      secretOrKey: configService.get<string>(
+        'JWT_REFRESH_SECRET',
+        'your-different-refresh-secret-change-in-production',
+      ),
       passReqToCallback: false,
     })
   }

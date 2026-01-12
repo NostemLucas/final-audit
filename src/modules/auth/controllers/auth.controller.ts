@@ -9,11 +9,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
-import * as express from 'express'
+import type { Request, Response } from 'express'
 import { AuthService } from '../services'
 import { LoginDto, LoginResponseDto } from '../dtos'
 import { Public, GetUser } from '../decorators'
-import * as AuthInterfaces from '../interfaces'
+import type { JwtPayload } from '../interfaces'
 
 /**
  * AuthController
@@ -61,7 +61,7 @@ export class AuthController {
   })
   async login(
     @Body() loginDto: LoginDto,
-    @Res({ passthrough: true }) res: express.Response,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<LoginResponseDto> {
     const { response, refreshToken } = await this.authService.login(loginDto)
 
@@ -109,8 +109,8 @@ export class AuthController {
     description: 'Refresh token inválido, revocado o expirado',
   })
   async refresh(
-    @Req() req: express.Request,
-    @Res({ passthrough: true }) res: express.Response,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string }> {
     const oldRefreshToken = req.cookies?.refreshToken
 
@@ -160,9 +160,9 @@ export class AuthController {
     description: 'No autenticado',
   })
   async logout(
-    @GetUser() user: AuthInterfaces.JwtPayload,
-    @Req() req: express.Request,
-    @Res({ passthrough: true }) res: express.Response,
+    @GetUser() user: JwtPayload,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     // Extraer access token del header Authorization
     const accessToken = this.extractTokenFromHeader(req)
@@ -184,10 +184,7 @@ export class AuthController {
   /**
    * Helper: Configura el refresh token en cookie HTTP-only
    */
-  private setRefreshTokenCookie(
-    res: express.Response,
-    refreshToken: string,
-  ): void {
+  private setRefreshTokenCookie(res: Response, refreshToken: string): void {
     const isProduction = process.env.NODE_ENV === 'production'
 
     res.cookie('refreshToken', refreshToken, {
@@ -202,7 +199,7 @@ export class AuthController {
   /**
    * Helper: Limpia la cookie del refresh token
    */
-  private clearRefreshTokenCookie(res: express.Response): void {
+  private clearRefreshTokenCookie(res: Response): void {
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -214,7 +211,7 @@ export class AuthController {
   /**
    * Helper: Extrae el access token del header Authorization
    */
-  private extractTokenFromHeader(req: express.Request): string | undefined {
+  private extractTokenFromHeader(req: Request): string | undefined {
     const authHeader = req.headers.authorization
     if (!authHeader) return undefined
 

@@ -205,7 +205,7 @@ export class LocalStorageService implements IStorageService {
 
     // Generar nombre único con UUID + timestamp para evitar colisiones
     const timestamp = Date.now()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
     const uuid: string = uuidv4()
     const uniqueName = `${uuid}-${timestamp}${extension}`
     return uniqueName

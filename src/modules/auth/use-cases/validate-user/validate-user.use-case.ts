@@ -39,8 +39,11 @@ export class ValidateUserUseCase {
     usernameOrEmail: string,
     password: string,
   ): Promise<UserEntity> {
-    // 1. Buscar usuario (por email o username)
-    const user = await this.findUserWithPassword(usernameOrEmail)
+    // 1. Buscar usuario (por email o username) incluyendo password
+    const user =
+      await this.usersRepository.findByUsernameOrEmailWithPassword(
+        usernameOrEmail,
+      )
 
     if (!user) {
       throw new InvalidCredentialsException()
@@ -62,31 +65,5 @@ export class ValidateUserUseCase {
     }
 
     return user
-  }
-
-  /**
-   * Busca un usuario por email o username e incluye el password
-   *
-   * NOTA: El campo password tiene select: false en la entity,
-   * por lo que debemos usar QueryBuilder con .addSelect() para incluirlo
-   *
-   * @param usernameOrEmail - Email o username (case-insensitive)
-   * @returns Usuario con password, o null si no existe
-   */
-  private async findUserWithPassword(
-    usernameOrEmail: string,
-  ): Promise<UserEntity | null> {
-    const normalized = usernameOrEmail.toLowerCase()
-
-    // Acceder al repository interno de TypeORM
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const repo = (this.usersRepository as any).getRepo()
-
-    return await repo
-      .createQueryBuilder('user')
-      .addSelect('user.password') // ✅ Incluir password explícitamente
-      .where('LOWER(user.email) = :identifier', { identifier: normalized })
-      .orWhere('LOWER(user.username) = :identifier', { identifier: normalized })
-      .getOne()
   }
 }

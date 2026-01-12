@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
 import { v4 as uuidv4 } from 'uuid'
+import type * as ms from 'ms'
 import { REDIS_CLIENT } from '@core/cache'
 import type { JwtPayload, JwtRefreshPayload } from '../interfaces'
 import type { UserEntity } from '../../users/entities/user.entity'
@@ -30,7 +31,12 @@ export class TokensService {
   ) {
     this.accessTokenExpiry = configService.get('JWT_EXPIRES_IN', '15m')
     this.refreshTokenExpiry = configService.get('JWT_REFRESH_EXPIRES_IN', '7d')
-    this.refreshTokenSecret = configService.get('JWT_REFRESH_SECRET')!
+
+    const refreshSecret = configService.get<string>('JWT_REFRESH_SECRET')
+    if (!refreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET is required in environment variables')
+    }
+    this.refreshTokenSecret = refreshSecret
   }
 
   /**
@@ -54,7 +60,7 @@ export class TokensService {
     }
 
     const accessToken = this.jwtService.sign(accessPayload, {
-      expiresIn: this.accessTokenExpiry as any,
+      expiresIn: this.accessTokenExpiry as ms.StringValue,
     })
 
     // Refresh Token (larga duración, en HTTP-only cookie)
@@ -65,7 +71,7 @@ export class TokensService {
 
     const refreshToken = this.jwtService.sign(refreshPayload, {
       secret: this.refreshTokenSecret,
-      expiresIn: this.refreshTokenExpiry as any,
+      expiresIn: this.refreshTokenExpiry as ms.StringValue,
     })
 
     // Almacenar refresh token en Redis con TTL
@@ -132,8 +138,14 @@ export class TokensService {
    */
   async blacklistAccessToken(token: string, userId: string): Promise<void> {
     try {
-      const decoded = this.jwtService.verify(token) as JwtPayload
-      const expiryTime = decoded.exp! * 1000 // convertir a milliseconds
+      const decoded = this.jwtService.verify<JwtPayload>(token)
+
+      // Verificar que exp existe antes de usar
+      if (!decoded.exp) {
+        return // Token sin expiración, no es necesario blacklistear
+      }
+
+      const expiryTime = decoded.exp * 1000 // convertir a milliseconds
       const now = Date.now()
       const ttlSeconds = Math.floor((expiryTime - now) / 1000)
 
@@ -181,7 +193,13 @@ export class TokensService {
    * @returns Payload decodificado
    */
   decodeRefreshToken(token: string): JwtRefreshPayload {
-    return this.jwtService.decode(token) as JwtRefreshPayload
+    const decoded = this.jwtService.decode(token)
+    // decode() puede devolver null, string o object
+    // Asumimos que es un JwtRefreshPayload válido si existe
+    if (!decoded || typeof decoded === 'string') {
+      throw new Error('Token inválido')
+    }
+    return decoded as JwtRefreshPayload
   }
 
   /**

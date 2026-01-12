@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 import { JwtModule } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
 import { APP_GUARD } from '@nestjs/core'
+import type * as ms from 'ms'
 import { UsersModule } from '../users/users.module'
 import { AuthController } from './controllers'
 import { TokensService, AuthService } from './services'
@@ -55,15 +56,27 @@ import { JwtAuthGuard, RolesGuard } from './guards'
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>(
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>(
           'JWT_SECRET',
           'your-secret-key-change-in-production',
-        ),
-        signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '15m') as any,
-        },
-      }),
+        )
+        const expiresIn = configService.get<string>(
+          'JWT_EXPIRES_IN',
+          '15m',
+        ) as ms.StringValue
+
+        if (!secret) {
+          throw new Error('JWT_SECRET is required')
+        }
+
+        return {
+          secret,
+          signOptions: {
+            expiresIn,
+          },
+        }
+      },
     }),
 
     // UsersModule para acceder a UserRepository

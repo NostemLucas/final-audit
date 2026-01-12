@@ -4,7 +4,7 @@ import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { EmailModule } from '@core/email/email.module'
 import { DatabaseModule } from '@core/database'
-import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core'
+import { APP_INTERCEPTOR, APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { LoggerModule } from '@core/logger'
 import { HttpExceptionFilter } from '@core/filters'
 import { LoggingInterceptor } from '@core/interceptors'
@@ -15,6 +15,7 @@ import { CacheModule } from '@core/cache'
 import { UsersModule } from './modules/users'
 import { OrganizationsModule } from './modules/organizations'
 import { AuthModule } from './modules/auth'
+import { AuthorizationModule, PermissionsGuard } from './modules/authorization'
 
 @Module({
   imports: [
@@ -30,7 +31,11 @@ import { AuthModule } from './modules/auth'
     LoggerModule,
     EmailModule,
     PersistenceModule,
-    AuthModule,
+
+    // Authentication & Authorization
+    AuthModule, // Guards: JwtAuthGuard, RolesGuard
+    AuthorizationModule, // Casbin-based permissions
+
     // Feature modules
     OrganizationsModule,
     UsersModule,
@@ -38,10 +43,29 @@ import { AuthModule } from './modules/auth'
   controllers: [AppController],
   providers: [
     AppService,
+
+    // ========================================
+    // Global Guards (orden de ejecución)
+    // ========================================
+    // 1. JwtAuthGuard (registrado en AuthModule)
+    // 2. RolesGuard (registrado en AuthModule)
+    // 3. PermissionsGuard (Casbin - DESPUÉS de Auth)
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
+    },
+
+    // ========================================
+    // Global Filters
+    // ========================================
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
     },
+
+    // ========================================
+    // Global Interceptors
+    // ========================================
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

@@ -138,7 +138,8 @@ function checkUploadsDirectory() {
         message: 'Se puede escribir en el directorio',
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorMessage =
+        error instanceof Error ? error.message : String(error)
       addCheck({
         name: 'Test de escritura falló',
         status: 'fail',
@@ -283,13 +284,17 @@ function printSummary() {
   if (failed === 0 && warnings === 0) {
     console.log(chalk.green.bold('🎉 ¡Verificación exitosa!'))
     console.log(
-      chalk.white('   El sistema de archivos está correctamente configurado.\n'),
+      chalk.white(
+        '   El sistema de archivos está correctamente configurado.\n',
+      ),
     )
     console.log(chalk.yellow('📝 Próximos pasos:'))
     console.log(chalk.white('   1. Ejecuta: npm run files:test'))
     console.log(chalk.white('   2. Inicia la app: npm run start:dev'))
     console.log(
-      chalk.white('   3. Prueba una URL: http://localhost:3001/uploads/test.jpg\n'),
+      chalk.white(
+        '   3. Prueba una URL: http://localhost:3001/uploads/test.jpg\n',
+      ),
     )
   } else if (failed === 0) {
     console.log(chalk.yellow.bold('⚠️  Verificación con warnings'))
@@ -298,11 +303,17 @@ function printSummary() {
         '   El sistema puede funcionar, pero hay configuraciones recomendadas.\n',
       ),
     )
-    console.log(chalk.yellow('💡 Revisa los warnings arriba y aplica las correcciones sugeridas.\n'))
+    console.log(
+      chalk.yellow(
+        '💡 Revisa los warnings arriba y aplica las correcciones sugeridas.\n',
+      ),
+    )
   } else {
     console.log(chalk.red.bold('❌ Verificación falló'))
     console.log(
-      chalk.white('   Hay problemas que deben ser corregidos antes de usar el sistema.\n'),
+      chalk.white(
+        '   Hay problemas que deben ser corregidos antes de usar el sistema.\n',
+      ),
     )
     console.log(chalk.yellow('💡 Correcciones sugeridas:\n'))
 
@@ -332,7 +343,10 @@ async function main() {
     printSummary()
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error(chalk.red('\n❌ Error durante la verificación:'), errorMessage)
+    console.error(
+      chalk.red('\n❌ Error durante la verificación:'),
+      errorMessage,
+    )
     if (error instanceof Error && error.stack) {
       console.error(chalk.gray(error.stack))
     }

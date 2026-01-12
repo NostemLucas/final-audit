@@ -33,6 +33,26 @@ export class UsersRepository
     })
   }
 
+  /**
+   * Busca un usuario por email o username e incluye el password
+   * Usado para autenticación
+   *
+   * @param usernameOrEmail - Email o username (case-insensitive)
+   * @returns Usuario con password, o null si no existe
+   */
+  async findByUsernameOrEmailWithPassword(
+    usernameOrEmail: string,
+  ): Promise<UserEntity | null> {
+    const normalized = usernameOrEmail.toLowerCase()
+
+    return await this.getRepo()
+      .createQueryBuilder('user')
+      .addSelect('user.password') // Incluir password explícitamente
+      .where('LOWER(user.email) = :identifier', { identifier: normalized })
+      .orWhere('LOWER(user.username) = :identifier', { identifier: normalized })
+      .getOne()
+  }
+
   async findByCI(ci: string): Promise<UserEntity | null> {
     return await this.getRepo().findOne({
       where: { ci },
