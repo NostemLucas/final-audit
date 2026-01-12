@@ -11,6 +11,7 @@ import { LoggingInterceptor } from '@core/interceptors'
 import { databaseConfig } from '@core/config'
 import { FilesModule } from '@core/files'
 import { PersistenceModule } from '@core/persistence'
+import { CacheModule } from '@core/cache'
 import { UsersModule } from './modules/users'
 import { OrganizationsModule } from './modules/organizations'
 import { AuthModule } from './modules/auth'
@@ -24,6 +25,7 @@ import { AuthModule } from './modules/auth'
       load: [databaseConfig],
     }),
     DatabaseModule,
+    CacheModule,
     FilesModule,
     LoggerModule,
     EmailModule,
