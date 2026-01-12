@@ -13,6 +13,7 @@ import { FilesModule } from '@core/files'
 import { PersistenceModule } from '@core/persistence'
 import { UsersModule } from './modules/users'
 import { OrganizationsModule } from './modules/organizations'
+import { AuthModule } from './modules/auth'
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { OrganizationsModule } from './modules/organizations'
     LoggerModule,
     EmailModule,
     PersistenceModule,
-
+    AuthModule,
     // Feature modules
     OrganizationsModule,
     UsersModule,

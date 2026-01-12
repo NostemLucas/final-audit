@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing'
 import { UserValidator } from './user.validator'
 import {
@@ -347,6 +348,25 @@ describe('UserValidator', () => {
       ).rejects.toThrow(UserNotFoundException)
 
       expect(mockRepository.findById).toHaveBeenCalledWith('nonexistent-id')
+    })
+  })
+  describe('should validate unique Roles', () => {
+    it('should pass when roles are valid', () => {
+      // Arrange
+      const roles = ['ADMIN', 'USER']
+
+      // Act & Assert
+      expect(() => validator.validateRoles(roles)).not.toThrow()
+    })
+
+    it('should throw an error when roles are invalid', () => {
+      // Arrange
+      const roles = ['INVALID_ROLE']
+
+      // Act & Assert
+      expect(() => validator.validateRoles(roles)).toThrow(
+        'Invalid role: INVALID_ROLE',
+      )
     })
   })
 })

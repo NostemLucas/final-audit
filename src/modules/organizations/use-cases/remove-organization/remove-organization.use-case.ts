@@ -1,6 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { Transactional } from '@core/database'
-import { OrganizationEntity } from '../../entities/organization.entity'
 import {
   OrganizationNotFoundException,
   OrganizationHasActiveUsersException,

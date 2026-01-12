@@ -63,7 +63,7 @@ export const TEST_USERS = {
     phone: '79876543',
     address: 'Av. Test 456',
     organizationId: 'org-2',
-    roles: [Role.USUARIO],
+    roles: [Role.CLIENTE],
     status: UserStatus.ACTIVE,
     image: null,
     createdAt: new Date('2024-01-03'),
@@ -82,7 +82,7 @@ export const TEST_USERS = {
     phone: null,
     address: null,
     organizationId: 'org-1', // ✅ Ahora es requerido
-    roles: [Role.USUARIO],
+    roles: [Role.CLIENTE],
     status: UserStatus.INACTIVE,
     image: null,
     createdAt: new Date('2024-01-04'),
@@ -103,7 +103,7 @@ export class UserBuilder {
     ci: '12345678',
     password: bcrypt.hashSync('TestPass123!', 10),
     organizationId: 'default-org-id', // ✅ organizationId requerido
-    roles: [Role.USUARIO],
+    roles: [Role.CLIENTE],
     status: UserStatus.ACTIVE,
     image: null,
   }
@@ -193,7 +193,7 @@ export function createTestUser(overrides?: Partial<UserEntity>): UserEntity {
     phone: null,
     address: null,
     organizationId: 'test-org-id', // ✅ organizationId requerido
-    roles: [Role.USUARIO],
+    roles: [Role.CLIENTE],
     status: UserStatus.ACTIVE,
     image: null,
     createdAt: new Date(),

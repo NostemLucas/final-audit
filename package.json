@@ -38,7 +38,14 @@
     "db:setup": "npm run migration:run && npm run seed:run",
     "email:test": "ts-node -r tsconfig-paths/register src/@core/email/email.test.ts",
     "email:template:create": "ts-node -r tsconfig-paths/register src/@core/email/scripts/create-template.ts",
-    "logger:test": "ts-node -r tsconfig-paths/register src/@core/logger/logger.test.ts"
+    "logger:test": "ts-node -r tsconfig-paths/register src/@core/logger/logger.test.ts",
+    "files:test": "ts-node -r tsconfig-paths/register src/@core/files/files.test.ts",
+    "files:verify": "ts-node -r tsconfig-paths/register src/@core/files/verify-setup.ts",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:ps": "docker compose ps",
+    "docker:verify": "./scripts/verify-docker.sh"
   },
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
@@ -60,7 +67,8 @@
     "cookie-parser": "^1.4.7",
     "googleapis": "^169.0.0",
     "handlebars": "^4.7.8",
-    "ioredis": "^5.8.2",
+    "ioredis": "^5.9.1",
+    "multer": "^2.0.2",
     "nestjs-cls": "^6.1.0",
     "nodemailer": "^7.0.12",
     "passport": "^0.7.0",
@@ -76,6 +84,7 @@
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.28",
     "typeorm-extension": "^3.7.3",
+    "uuid": "^13.0.0",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
@@ -90,6 +99,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
+    "@types/ioredis": "^4.28.10",
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.0.0",
     "@types/node": "^22.10.7",
@@ -98,8 +108,10 @@
     "@types/passport-local": "^1.0.38",
     "@types/sharp": "^0.31.1",
     "@types/supertest": "^6.0.2",
+    "@types/uuid": "^10.0.0",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
+    "dotenv": "^17.2.3",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
@@ -136,9 +148,7 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
-    "setupFilesAfterEnv": [
-      "<rootDir>/tests/jest.setup.ts"
-    ],
+    "clearMocks": true,
     "moduleNameMapper": {
       "^@core/(.*)$": "<rootDir>/@core/$1",
       "^@core$": "<rootDir>/@core",
@@ -146,7 +156,7 @@
       "^@shared$": "<rootDir>/@shared"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(chalk|#ansi-styles|#supports-color)/)"
+      "node_modules/(?!(chalk|#ansi-styles|#supports-color|uuid)/)"
     ]
   }
 }

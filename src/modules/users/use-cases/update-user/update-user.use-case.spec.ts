@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing'
 import { UpdateUserUseCase } from './update-user.use-case'
 import { UserValidator } from '../../validators/user.validator'
@@ -78,7 +79,7 @@ describe('UpdateUserUseCase', () => {
         names: 'Carlos',
       }
 
-      mockRepository.findById.mockResolvedValue(existingUser)
+      mockRepository.findById.mockResolvedValue({ ...existingUser })
       mockRepository.save.mockImplementation((user) =>
         Promise.resolve(user as UserEntity),
       )
@@ -109,7 +110,7 @@ describe('UpdateUserUseCase', () => {
         email: 'newemail@test.com',
       }
 
-      mockRepository.findById.mockResolvedValue(existingUser)
+      mockRepository.findById.mockResolvedValue({ ...existingUser })
       mockValidator.validateUniqueEmail.mockResolvedValue(undefined)
       mockRepository.save.mockImplementation((user) =>
         Promise.resolve(user as UserEntity),
@@ -131,7 +132,7 @@ describe('UpdateUserUseCase', () => {
         email: 'juan@test.com', // Same as existing
       }
 
-      mockRepository.findById.mockResolvedValue(existingUser)
+      mockRepository.findById.mockResolvedValue({ ...existingUser })
       mockRepository.save.mockImplementation((user) =>
         Promise.resolve(user as UserEntity),
       )
@@ -149,7 +150,7 @@ describe('UpdateUserUseCase', () => {
         organizationId: 'org-2',
       }
 
-      mockRepository.findById.mockResolvedValue(existingUser)
+      mockRepository.findById.mockResolvedValue({ ...existingUser })
       mockValidator.validateOrganizationExists.mockResolvedValue(undefined)
       mockRepository.save.mockImplementation((user) =>
         Promise.resolve(user as UserEntity),
@@ -172,7 +173,7 @@ describe('UpdateUserUseCase', () => {
         ci: '87654321',
       }
 
-      mockRepository.findById.mockResolvedValue(existingUser)
+      mockRepository.findById.mockResolvedValue({ ...existingUser })
       mockValidator.validateUniqueEmail.mockResolvedValue(undefined)
       mockValidator.validateUniqueUsername.mockResolvedValue(undefined)
       mockValidator.validateUniqueCI.mockResolvedValue(undefined)
@@ -195,7 +196,7 @@ describe('UpdateUserUseCase', () => {
         email: 'NEWEMAIL@TEST.COM',
       }
 
-      mockRepository.findById.mockResolvedValue(existingUser)
+      mockRepository.findById.mockResolvedValue({ ...existingUser })
       mockValidator.validateUniqueEmail.mockResolvedValue(undefined)
       mockRepository.save.mockImplementation((user) =>
         Promise.resolve(user as UserEntity),

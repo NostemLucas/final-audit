@@ -7,6 +7,7 @@ import { OrganizationEntity } from '../entities/organization.entity'
 import {
   NameAlreadyExistsException,
   NitAlreadyExistsException,
+  OrganizationHasActiveUsersException,
   OrganizationNotFoundException,
 } from '../exceptions'
 import { USERS_REPOSITORY } from '../../users/tokens'
@@ -225,5 +226,30 @@ describe('OrganizationValidator', () => {
         ),
       ).resolves.not.toThrow()
     })
+  })
+
+  describe('validateCanBeDeactivated', () => {
+    it('should pass when organization has no active users', async () => {
+      // Arrange
+      usersRepository.countUsersByOrganization.mockResolvedValue(0)
+
+      // Act & Assert
+      await expect(
+        validator.validateCanBeDeactivated('1'),
+      ).resolves.not.toThrow()
+
+      expect(usersRepository.countUsersByOrganization).toHaveBeenCalledWith('1')
+    })
+  })
+  it('should throw OrganizationHasActiveUsersException when organization has active users', async () => {
+    // Arrange
+    usersRepository.countUsersByOrganization.mockResolvedValue(5)
+
+    // Act & Assert
+    await expect(validator.validateCanBeDeactivated('1')).rejects.toThrow(
+      OrganizationHasActiveUsersException,
+    )
+
+    expect(usersRepository.countUsersByOrganization).toHaveBeenCalledWith('1')
   })
 })

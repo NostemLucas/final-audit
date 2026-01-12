@@ -9,6 +9,7 @@ Se ha actualizado el sistema para que **todos los usuarios deben pertenecer obli
 ### 1. Entidad User (`user.entity.ts`)
 
 **Antes:**
+
 ```typescript
 @Column({ type: 'uuid', nullable: true })
 organizationId: string | null
@@ -20,6 +21,7 @@ organization: OrganizationEntity
 ```
 
 **Después:**
+
 ```typescript
 @Column({ type: 'uuid' })
 organizationId: string
@@ -33,6 +35,7 @@ organization: OrganizationEntity
 ### 2. DTOs
 
 **CreateUserDto:**
+
 ```typescript
 // Antes
 @ApiPropertyOptional()
@@ -94,7 +97,7 @@ const dto: CreateUserDto = {
   ci: '55555555',
   password: 'NewPass123!',
   organizationId: 'org-1', // ✅ Requerido
-  roles: [Role.USUARIO],
+  roles: [Role.CLIENTE],
   status: UserStatus.ACTIVE,
 }
 ```
@@ -104,6 +107,7 @@ const dto: CreateUserDto = {
 **Archivo:** `src/@core/database/migrations/MakeOrganizationIdRequired.ts`
 
 La migración:
+
 1. ✅ Verifica que exista al menos una organización
 2. ✅ Asigna la primera organización a usuarios con `organizationId = NULL`
 3. ✅ Hace la columna `NOT NULL`
@@ -129,6 +133,7 @@ npm run migration:run
 ```
 
 La migración automáticamente:
+
 - Asignará la primera organización a usuarios sin organizationId (si existen)
 - Hará la columna NOT NULL
 
@@ -207,6 +212,7 @@ npm run migration:revert
 ```
 
 Luego tendrías que revertir manualmente:
+
 1. Cambiar `user.entity.ts` a `nullable: true`
 2. Cambiar `create-user.dto.ts` a `@IsOptional()`
 3. Actualizar fixtures y tests
@@ -216,6 +222,7 @@ Luego tendrías que revertir manualmente:
 ### 1. Usuarios Existentes
 
 Si tienes usuarios en tu base de datos **sin** `organizationId`:
+
 - La migración los asignará automáticamente a la primera organización disponible
 - Revisa y actualiza manualmente si es necesario
 
@@ -241,22 +248,24 @@ await userRepository.save({
 ### 3. Flujo de Registro
 
 Asegúrate de que tu flujo de registro de usuarios:
+
 1. Primero crea o selecciona una organización
 2. Luego crea el usuario con el `organizationId`
 
 O en algunos casos:
+
 1. El admin selecciona la organización al crear un usuario
 2. El usuario se crea automáticamente en la organización del admin
 
 ## 📊 Impacto
 
-| Aspecto | Antes | Después |
-|---------|-------|---------|
-| **organizationId** | Opcional | **Requerido** |
-| **Usuarios sin org** | Permitido | **NO permitido** |
-| **Validación API** | No valida | **Valida UUID** |
-| **Tests** | 26/26 pasando | **26/26 pasando** ✅ |
-| **Tipo TypeScript** | `string \| null` | `string` |
+| Aspecto              | Antes            | Después              |
+| -------------------- | ---------------- | -------------------- |
+| **organizationId**   | Opcional         | **Requerido**        |
+| **Usuarios sin org** | Permitido        | **NO permitido**     |
+| **Validación API**   | No valida        | **Valida UUID**      |
+| **Tests**            | 26/26 pasando    | **26/26 pasando** ✅ |
+| **Tipo TypeScript**  | `string \| null` | `string`             |
 
 ## ✅ Checklist de Implementación
 

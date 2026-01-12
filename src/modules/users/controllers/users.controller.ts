@@ -53,27 +53,6 @@ export class UsersController {
     return await this.usersService.findOne(id)
   }
 
-  @Get('email/:email')
-  @ApiOperation({ summary: 'Buscar usuario por email' })
-  @ApiResponse({ status: 200, description: 'Usuario encontrado o null' })
-  async findByEmail(@Param('email') email: string) {
-    return await this.usersService.findByEmail(email)
-  }
-
-  @Get('username/:username')
-  @ApiOperation({ summary: 'Buscar usuario por username' })
-  @ApiResponse({ status: 200, description: 'Usuario encontrado o null' })
-  async findByUsername(@Param('username') username: string) {
-    return await this.usersService.findByUsername(username)
-  }
-
-  @Get('ci/:ci')
-  @ApiOperation({ summary: 'Buscar usuario por CI' })
-  @ApiResponse({ status: 200, description: 'Usuario encontrado o null' })
-  async findByCI(@Param('ci') ci: string) {
-    return await this.usersService.findByCI(ci)
-  }
-
   @Get('organization/:organizationId')
   @ApiOperation({ summary: 'Listar usuarios por organización' })
   @ApiResponse({
@@ -133,6 +112,18 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async deactivate(@Param('id') id: string) {
     return await this.usersService.deactivate(id)
+  }
+
+  @Patch(':id/activate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Activar un usuario',
+    description: 'Cambia el estado del usuario a ACTIVE',
+  })
+  @ApiResponse({ status: 200, description: 'Usuario desactivado exitosamente' })
+  @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
+  async activate(@Param('id') id: string) {
+    return await this.usersService.activate(id)
   }
 
   @Delete(':id')

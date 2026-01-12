@@ -6,13 +6,11 @@ import {
   UpdateUserUseCase,
   FindAllUsersUseCase,
   FindUserByIdUseCase,
-  FindUserByEmailUseCase,
-  FindUserByUsernameUseCase,
-  FindUserByCIUseCase,
   FindUsersByOrganizationUseCase,
   UploadProfileImageUseCase,
   DeactivateUserUseCase,
   RemoveUserUseCase,
+  ActivateUserUseCase,
 } from '../use-cases'
 
 /**
@@ -28,13 +26,11 @@ export class UsersService {
     private readonly updateUserUseCase: UpdateUserUseCase,
     private readonly findAllUsersUseCase: FindAllUsersUseCase,
     private readonly findUserByIdUseCase: FindUserByIdUseCase,
-    private readonly findUserByEmailUseCase: FindUserByEmailUseCase,
-    private readonly findUserByUsernameUseCase: FindUserByUsernameUseCase,
-    private readonly findUserByCIUseCase: FindUserByCIUseCase,
     private readonly findUsersByOrganizationUseCase: FindUsersByOrganizationUseCase,
     private readonly uploadProfileImageUseCase: UploadProfileImageUseCase,
     private readonly deactivateUserUseCase: DeactivateUserUseCase,
     private readonly removeUserUseCase: RemoveUserUseCase,
+    private readonly activateUserUseCase: ActivateUserUseCase,
   ) {}
 
   /**
@@ -56,27 +52,6 @@ export class UsersService {
    */
   async findOne(id: string): Promise<UserEntity> {
     return await this.findUserByIdUseCase.execute(id)
-  }
-
-  /**
-   * Busca un usuario por email
-   */
-  async findByEmail(email: string): Promise<UserEntity> {
-    return await this.findUserByEmailUseCase.execute(email)
-  }
-
-  /**
-   * Busca un usuario por username
-   */
-  async findByUsername(username: string): Promise<UserEntity> {
-    return await this.findUserByUsernameUseCase.execute(username)
-  }
-
-  /**
-   * Busca un usuario por CI
-   */
-  async findByCI(ci: string): Promise<UserEntity> {
-    return await this.findUserByCIUseCase.execute(ci)
   }
 
   /**
@@ -108,6 +83,9 @@ export class UsersService {
    */
   async deactivate(id: string): Promise<UserEntity> {
     return await this.deactivateUserUseCase.execute(id)
+  }
+  async activate(id: string): Promise<UserEntity> {
+    return await this.activateUserUseCase.execute(id)
   }
 
   /**

@@ -160,8 +160,8 @@ describe('UserFactory', () => {
         password: 'Pass123!',
         phone: undefined,
         address: undefined,
-        organizationId: undefined,
-        roles: [Role.USUARIO],
+        organizationId: 'org-1',
+        roles: [Role.CLIENTE],
         status: UserStatus.ACTIVE,
       }
 
@@ -171,7 +171,6 @@ describe('UserFactory', () => {
       // Assert
       expect(result.phone).toBeNull()
       expect(result.address).toBeNull()
-      expect(result.organizationId).toBeNull()
       expect(result.image).toBeNull()
     })
 
@@ -221,7 +220,7 @@ describe('UserFactory', () => {
         phone: '71234567',
         address: 'Original Address',
         organizationId: 'org-1',
-        roles: [Role.USUARIO],
+        roles: [Role.CLIENTE],
         status: UserStatus.ACTIVE,
         image: null,
       } as UserEntity
@@ -326,19 +325,6 @@ describe('UserFactory', () => {
       expect(result.roles).toEqual([Role.ADMIN, Role.GERENTE])
     })
 
-    it('should update organizationId', () => {
-      // Arrange
-      const dto: UpdateUserDto = {
-        organizationId: 'new-org-id',
-      }
-
-      // Act
-      const result = factory.updateFromDto(existingUser, dto)
-
-      // Assert
-      expect(result.organizationId).toBe('new-org-id')
-    })
-
     it('should not modify fields not present in DTO', () => {
       // Arrange
       const dto: UpdateUserDto = {
@@ -418,7 +404,8 @@ describe('UserFactory', () => {
         username: 'testuser',
         ci: '12345678',
         password: 'MyPlainPassword123!',
-        roles: [Role.USUARIO],
+        organizationId: 'org-1',
+        roles: [Role.CLIENTE],
         status: UserStatus.ACTIVE,
       }
 
@@ -443,9 +430,10 @@ describe('UserFactory', () => {
         lastNames: 'Test',
         email: 'test@test.com',
         username: 'testuser',
+        organizationId: 'org-1',
         ci: '12345678',
         password: 'Pass123!',
-        roles: [Role.USUARIO],
+        roles: [Role.CLIENTE],
         status: UserStatus.ACTIVE,
       }
 
@@ -464,8 +452,9 @@ describe('UserFactory', () => {
         email: 'test+filter@test.com',
         username: 'testuser',
         ci: '12345678',
+        organizationId: 'org-1',
         password: 'Pass123!',
-        roles: [Role.USUARIO],
+        roles: [Role.CLIENTE],
         status: UserStatus.ACTIVE,
       }
 
@@ -482,10 +471,11 @@ describe('UserFactory', () => {
         names: 'Test',
         lastNames: 'User',
         email: 'test@test.com',
+        organizationId: 'org-1',
         username: 'User123Test',
         ci: '12345678',
         password: 'Pass123!',
-        roles: [Role.USUARIO],
+        roles: [Role.CLIENTE],
         status: UserStatus.ACTIVE,
       }
 
@@ -503,6 +493,7 @@ describe('UserFactory', () => {
         lastNames: 'User',
         email: 'test@test.com',
         username: 'testuser',
+        organizationId: 'org-1',
         ci: '12345678',
         password: 'Pass123!',
         roles: [],
@@ -525,7 +516,8 @@ describe('UserFactory', () => {
         username: 'test1',
         ci: '11111111',
         password: 'Pass123!',
-        roles: [Role.USUARIO],
+        organizationId: 'org-1',
+        roles: [Role.CLIENTE],
         status: UserStatus.ACTIVE,
       })
 
@@ -536,7 +528,8 @@ describe('UserFactory', () => {
         username: 'test2',
         ci: '22222222',
         password: 'Pass123!',
-        roles: [Role.USUARIO],
+        organizationId: 'org-1',
+        roles: [Role.CLIENTE],
         status: UserStatus.INACTIVE,
       })
 
@@ -547,7 +540,8 @@ describe('UserFactory', () => {
         username: 'test3',
         ci: '33333333',
         password: 'Pass123!',
-        roles: [Role.USUARIO],
+        roles: [Role.CLIENTE],
+        organizationId: 'org-1',
         status: UserStatus.SUSPENDED,
       })
 
@@ -564,9 +558,10 @@ describe('UserFactory', () => {
         lastNames: 'User',
         email: 'test@test.com',
         username: 'testuser',
+        organizationId: 'org-1',
         ci: '12345678',
         password: 'Pass123!',
-        roles: [Role.ADMIN, Role.GERENTE, Role.AUDITOR, Role.USUARIO],
+        roles: [Role.ADMIN, Role.GERENTE, Role.AUDITOR, Role.CLIENTE],
         status: UserStatus.ACTIVE,
       }
 
@@ -577,7 +572,7 @@ describe('UserFactory', () => {
       expect(result.roles).toContain(Role.ADMIN)
       expect(result.roles).toContain(Role.GERENTE)
       expect(result.roles).toContain(Role.AUDITOR)
-      expect(result.roles).toContain(Role.USUARIO)
+      expect(result.roles).toContain(Role.CLIENTE)
       expect(result.roles.length).toBe(4)
     })
   })

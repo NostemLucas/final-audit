@@ -13,6 +13,7 @@ import type { IUsersRepository } from '../../repositories'
  * Responsabilidades:
  * - Validar constraints únicas (email, username, CI)
  * - Validar que la organización existe
+ * - Validar roles exclusivos
  * - Crear entidad de usuario con datos normalizados
  * - Persistir el usuario en la base de datos
  */
@@ -27,20 +28,14 @@ export class CreateUserUseCase {
 
   @Transactional()
   async execute(dto: CreateUserDto): Promise<UserEntity> {
-    // 1. Validar constraints únicas en paralelo
+    this.validator.validateRoles(dto.roles)
     await this.validator.validateUniqueConstraints(
       dto.email,
       dto.username,
       dto.ci,
     )
-
-    // 2. Validar que la organización existe
     await this.validator.validateOrganizationExists(dto.organizationId)
-
-    // 3. Crear usuario usando factory (normaliza datos y hashea password)
     const user = this.userFactory.createFromDto(dto)
-
-    // 4. Persistir usuario
     return await this.usersRepository.save(user)
   }
 }

@@ -8,57 +8,33 @@ import {
   UpdateUserUseCase,
   FindAllUsersUseCase,
   FindUserByIdUseCase,
-  FindUserByEmailUseCase,
-  FindUserByUsernameUseCase,
-  FindUserByCIUseCase,
   FindUsersByOrganizationUseCase,
   UploadProfileImageUseCase,
   DeactivateUserUseCase,
   RemoveUserUseCase,
+  ActivateUserUseCase,
 } from './use-cases'
 
-/**
- * Módulo de Usuarios (Simplificado con PersistenceModule)
- *
- * ✅ Ya NO necesita:
- * - Importar TypeOrmModule.forFeature([UserEntity])
- * - Importar OrganizationsModule
- * - Proveer USERS_REPOSITORY
- * - Exportar USERS_REPOSITORY
- *
- * 🎯 Responsabilidades:
- * - Controladores
- * - Servicios
- * - Use Cases
- * - Validadores
- * - Factories
- *
- * 📦 Los repositorios vienen de PersistenceModule (global)
- */
 @Module({
   imports: [],
   controllers: [UsersController],
   providers: [
     // Service (facade)
     UsersService,
-
     // Use Cases
     CreateUserUseCase,
     UpdateUserUseCase,
     FindAllUsersUseCase,
     FindUserByIdUseCase,
-    FindUserByEmailUseCase,
-    FindUserByUsernameUseCase,
-    FindUserByCIUseCase,
     FindUsersByOrganizationUseCase,
     UploadProfileImageUseCase,
     DeactivateUserUseCase,
     RemoveUserUseCase,
-
+    ActivateUserUseCase,
     // Infrastructure
     UserValidator,
     UserFactory,
   ],
-  exports: [],
+  exports: [UserFactory],
 })
 export class UsersModule {}

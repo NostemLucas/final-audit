@@ -25,7 +25,7 @@ export class UserFactory {
     user.password = this.hashPassword(dto.password)
     user.phone = dto.phone ?? null
     user.address = dto.address ?? null
-    user.organizationId = dto.organizationId // Requerido - un usuario debe pertenecer a una organización
+    user.organizationId = dto.organizationId
     user.roles = dto.roles
     user.status = dto.status ?? UserStatus.ACTIVE
     user.image = null
@@ -49,8 +49,6 @@ export class UserFactory {
     if (dto.ci !== undefined) user.ci = dto.ci
     if (dto.phone !== undefined) user.phone = dto.phone
     if (dto.address !== undefined) user.address = dto.address
-    if (dto.organizationId !== undefined)
-      user.organizationId = dto.organizationId
     if (dto.roles !== undefined) user.roles = dto.roles
     if (dto.status !== undefined) user.status = dto.status
 

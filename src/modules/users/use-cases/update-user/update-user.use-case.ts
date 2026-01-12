@@ -38,11 +38,11 @@ export class UpdateUserUseCase {
     // 2. Validar solo los campos que cambiaron
     const validations: Promise<void>[] = []
 
-    if (dto.email && dto.email !== user.email) {
+    if (dto.email && dto.email.toLowerCase() !== user.email) {
       validations.push(this.validator.validateUniqueEmail(dto.email, id))
     }
 
-    if (dto.username && dto.username !== user.username) {
+    if (dto.username && dto.username.toLowerCase() !== user.username) {
       validations.push(this.validator.validateUniqueUsername(dto.username, id))
     }
 
@@ -50,12 +50,9 @@ export class UpdateUserUseCase {
       validations.push(this.validator.validateUniqueCI(dto.ci, id))
     }
 
-    if (dto.organizationId && dto.organizationId !== user.organizationId) {
-      validations.push(
-        this.validator.validateOrganizationExists(dto.organizationId),
-      )
+    if (dto.roles) {
+      this.validator.validateRoles(dto.roles)
     }
-
     // Ejecutar validaciones en paralelo
     if (validations.length > 0) {
       await Promise.all(validations)

@@ -8,6 +8,18 @@ This is a NestJS application for audit management (ATR - Audit Template Reposito
 
 ## Common Commands
 
+### Docker (PostgreSQL & Redis)
+```bash
+docker-compose up -d        # Start PostgreSQL & Redis in background
+docker-compose down         # Stop services (keeps data)
+docker-compose down -v      # Stop and remove data (⚠️ destructive)
+docker-compose ps           # View service status
+docker-compose logs -f      # View logs (follow mode)
+docker-compose restart      # Restart all services
+```
+
+**See [DOCKER.md](./DOCKER.md) for detailed Docker documentation.**
+
 ### Development
 ```bash
 npm install                 # Install dependencies
@@ -64,6 +76,19 @@ npm run email:test:verify  # Test verification email
 npm run email:test:2fa     # Test 2FA code email
 npm run email:test:reset   # Test password reset email
 npm run email:template:create -- template-name  # Create new email template
+```
+
+### File Storage Testing
+```bash
+npm run files:verify                         # Verify system configuration (run first!)
+npm run files:test                           # Test all file operations
+npm run files:test upload                    # Upload test image
+npm run files:test upload pdf                # Upload test PDF
+npm run files:test upload text               # Upload test text file
+npm run files:test delete test-uploads/file.jpg    # Delete file
+npm run files:test exists test-uploads/file.jpg    # Check if file exists
+npm run files:test url test-uploads/file.jpg       # Get file URL
+npm run files:test replace                   # Test file replacement
 ```
 
 ### Git

@@ -2,6 +2,7 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": "..",
   "testEnvironment": "node",
+  "clearMocks": true,
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
@@ -10,9 +11,10 @@
     "^@core/(.*)$": "<rootDir>/src/@core/$1",
     "^@core$": "<rootDir>/src/@core",
     "^@shared/(.*)$": "<rootDir>/src/@shared/$1",
-    "^@shared$": "<rootDir>/src/@shared"
+    "^@shared$": "<rootDir>/src/@shared",
+    "^uuid$": "uuid"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(chalk|#ansi-styles|#supports-color)/)"
+    "node_modules/(?!(chalk|#ansi-styles|#supports-color|uuid)/)"
   ]
 }

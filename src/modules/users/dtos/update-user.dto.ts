@@ -7,5 +7,5 @@ import { CreateUserDto } from './create-user.dto'
  * (el password se actualiza mediante el módulo de autenticación)
  */
 export class UpdateUserDto extends PartialType(
-  OmitType(CreateUserDto, ['password'] as const),
+  OmitType(CreateUserDto, ['password', 'organizationId'] as const),
 ) {}

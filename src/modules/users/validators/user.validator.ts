@@ -7,9 +7,11 @@ import {
   CiAlreadyExistsException,
   UserNotFoundException,
   OrganizationNotFoundForUserException,
+  ExclusiveRoleException,
 } from '../exceptions'
 import { ORGANIZATION_REPOSITORY } from '../../organizations/tokens'
 import type { IOrganizationRepository } from '../../organizations/repositories'
+import { Role } from '../entities'
 
 /**
  * Servicio de validación de reglas de negocio para usuarios
@@ -112,6 +114,12 @@ export class UserValidator {
     const user = await this.usersRepository.findById(userId)
     if (!user) {
       throw new UserNotFoundException(userId)
+    }
+  }
+
+  validateRoles(roles: Role[]): void {
+    if (roles.includes(Role.CLIENTE) && roles.length > 1) {
+      throw new ExclusiveRoleException()
     }
   }
 }

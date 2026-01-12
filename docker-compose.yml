@@ -12,9 +12,31 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - atr_network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: atr_redis
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - atr_network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   atr_network:

@@ -1,19 +1,45 @@
 import { NestFactory } from '@nestjs/core'
+import { NestExpressApplication } from '@nestjs/platform-express'
 import { AppModule } from './app.module'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { LoggerService } from '@core/logger'
+import cookieParser from 'cookie-parser'
+import { join } from 'path'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule)
   const logger = app.get(LoggerService)
   const port = Number(process.env.PORT) || 3001
   app.useLogger(logger)
+
+  // Configurar archivos estáticos para uploads
+  const uploadsDir = process.env.UPLOADS_DIR || join(process.cwd(), 'uploads')
+  app.useStaticAssets(uploadsDir, {
+    prefix: '/uploads/',
+    index: false, // Deshabilitar index.html automático
+  })
+  logger.log(`📁 Archivos estáticos servidos desde: ${uploadsDir}`)
+  logger.log(`🌐 URL de acceso: http://localhost:${port}/uploads/`)
+
+  // Configurar CORS
+  const corsOrigin = process.env.CORS_ORIGIN || '*'
+  app.enableCors({
+    origin: corsOrigin,
+    credentials: true,
+  })
+  logger.log(`🔓 CORS habilitado para: ${corsOrigin}`)
+
+  // Middleware para parsear cookies (requerido para refresh tokens)
+  app.use(cookieParser())
+
+  // Configurar Swagger
   const config = new DocumentBuilder()
     .setTitle('ATR API')
     .setDescription(
       'API de auditorías, plantillas, frameworks de madurez y gestión de usuarios',
     )
     .setVersion('1.0')
+    .addTag('Auth', 'Autenticación JWT con refresh tokens')
     .addTag('users', 'Gestión de usuarios')
     .addTag('notifications', 'Sistema de notificaciones')
     .addTag('templates', 'Gestión de plantillas (ISO 27001, ISO 9001, etc.)')
@@ -46,6 +72,8 @@ async function bootstrap() {
   )
   const document = SwaggerModule.createDocument(app, config)
   SwaggerModule.setup('api', app, document)
+
   await app.listen(process.env.PORT ?? port)
 }
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
 bootstrap()
