@@ -51,7 +51,11 @@ export class UpdateUserUseCase {
     }
 
     if (dto.roles) {
+      // Validar que los roles sean válidos y cumplan reglas básicas
       this.validator.validateRoles(dto.roles)
+
+      // Validar transición de roles (CLIENTE no puede cambiar a otro rol)
+      this.validator.validateRoleTransition(user, dto.roles)
     }
     // Ejecutar validaciones en paralelo
     if (validations.length > 0) {

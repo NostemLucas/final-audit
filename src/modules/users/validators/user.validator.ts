@@ -9,9 +9,11 @@ import {
   OrganizationNotFoundForUserException,
   ExclusiveRoleException,
 } from '../exceptions'
+import { InvalidRoleException } from '../exceptions/invalid-role.exception'
+import { RoleTransitionException } from '../exceptions/role-transition.exception'
 import { ORGANIZATION_REPOSITORY } from '../../organizations/tokens'
 import type { IOrganizationRepository } from '../../organizations/repositories'
-import { Role } from '../entities'
+import { Role, UserEntity } from '../entities'
 
 /**
  * Servicio de validación de reglas de negocio para usuarios
@@ -117,9 +119,53 @@ export class UserValidator {
     }
   }
 
+  /**
+   * Valida que los roles sean válidos y cumplan las reglas de negocio
+   *
+   * Reglas:
+   * 1. Todos los roles deben ser valores válidos del enum Role
+   * 2. El rol CLIENTE no puede combinarse con otros roles (exclusivo)
+   *
+   * @param roles - Array de roles a validar
+   * @throws InvalidRoleException si algún rol no es válido
+   * @throws ExclusiveRoleException si CLIENTE está combinado con otros roles
+   */
   validateRoles(roles: Role[]): void {
+    // Validar que todos los roles sean valores válidos del enum
+    const validRoles = Object.values(Role)
+    for (const role of roles) {
+      if (!validRoles.includes(role)) {
+        throw new InvalidRoleException(role)
+      }
+    }
+
+    // Validar exclusividad del rol CLIENTE
     if (roles.includes(Role.CLIENTE) && roles.length > 1) {
       throw new ExclusiveRoleException()
+    }
+  }
+
+  /**
+   * Valida la transición de roles al actualizar un usuario
+   *
+   * Regla de negocio CRÍTICA:
+   * - Si un usuario tiene rol CLIENTE, NO puede cambiar a otro rol
+   * - Esta es una restricción permanente por motivos de seguridad y auditoría
+   * - Si se necesita un usuario con otro rol, debe crearse uno nuevo
+   *
+   * @param currentUser - Usuario actual con sus roles actuales
+   * @param newRoles - Nuevos roles que se quieren asignar
+   * @throws RoleTransitionException si se intenta cambiar desde CLIENTE
+   */
+  validateRoleTransition(currentUser: UserEntity, newRoles: Role[]): void {
+    // Si el usuario actual tiene rol CLIENTE
+    const wasCliente = currentUser.roles.includes(Role.CLIENTE)
+
+    // Y los nuevos roles NO incluyen CLIENTE (intento de cambio)
+    const isChangingFromCliente = wasCliente && !newRoles.includes(Role.CLIENTE)
+
+    if (isChangingFromCliente) {
+      throw new RoleTransitionException()
     }
   }
 }

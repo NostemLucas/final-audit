@@ -9,13 +9,25 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Res,
+  BadRequestException,
+  UploadedFile,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiConsumes,
+} from '@nestjs/swagger'
+import type { Response } from 'express'
+import { UploadSpreadsheet } from '@core/files'
 import {
   CreateTemplateDto,
   UpdateTemplateDto,
   CloneTemplateDto,
 } from '../use-cases'
+import { ImportTemplateMetadataDto } from '../dtos'
 import { CreateTemplateUseCase } from '../use-cases/create-template/create-template.use-case'
 import { UpdateTemplateUseCase } from '../use-cases/update-template/update-template.use-case'
 import { DeleteTemplateUseCase } from '../use-cases/delete-template/delete-template.use-case'
@@ -24,6 +36,7 @@ import { FindTemplatesUseCase } from '../use-cases/find-templates/find-templates
 import { PublishTemplateUseCase } from '../use-cases/publish-template/publish-template.use-case'
 import { ArchiveTemplateUseCase } from '../use-cases/archive-template/archive-template.use-case'
 import { CloneTemplateUseCase } from '../use-cases/clone-template/clone-template.use-case'
+import { TemplateImportService } from '../services/template-import.service'
 
 @ApiTags('templates')
 @Controller('templates')
@@ -37,6 +50,7 @@ export class TemplatesController {
     private readonly publishTemplateUseCase: PublishTemplateUseCase,
     private readonly archiveTemplateUseCase: ArchiveTemplateUseCase,
     private readonly cloneTemplateUseCase: CloneTemplateUseCase,
+    private readonly templateImportService: TemplateImportService,
   ) {}
 
   @Post()
@@ -138,5 +152,171 @@ export class TemplatesController {
     @Body() cloneTemplateDto: CloneTemplateDto,
   ) {
     return await this.cloneTemplateUseCase.execute(id, cloneTemplateDto)
+  }
+
+  // ========================================
+  // Import/Export Endpoints
+  // ========================================
+
+  @Post('import/excel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Importar plantilla desde Excel',
+    description:
+      'Sube un archivo Excel con 1 hoja "Estándares" + campos de formulario (name, description, version). Valida y crea la plantilla con sus estándares.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({
+    status: 200,
+    description: 'Plantilla importada exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Errores de validación en el archivo o campos',
+  })
+  @UploadSpreadsheet({ fieldName: 'file', maxSize: 15 * 1024 * 1024 })
+  async importExcel(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() metadata: ImportTemplateMetadataDto,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No se proporcionó archivo')
+    }
+
+    // Step 1: Process and validate file
+    const importResult = await this.templateImportService.processExcelFile(
+      file.buffer,
+    )
+
+    // Step 2: If validation successful, save to database
+    if (importResult.success) {
+      const savedResult = await this.templateImportService.saveImportResult(
+        metadata,
+        importResult,
+      )
+      return {
+        success: true,
+        message: 'Plantilla importada exitosamente',
+        data: savedResult,
+        summary: importResult.summary,
+      }
+    }
+
+    // Step 3: Return validation errors
+    return {
+      success: false,
+      message: 'Errores de validación encontrados',
+      errors: {
+        standards: importResult.standards.errors,
+        crossValidation: importResult.crossValidationErrors,
+      },
+      summary: importResult.summary,
+    }
+  }
+
+  @Post('import/csv')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Importar plantilla desde CSV',
+    description:
+      'Sube 1 archivo CSV con estándares + campos de formulario (name, description, version). Valida y crea la plantilla con sus estándares.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({
+    status: 200,
+    description: 'Plantilla importada exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Errores de validación en el archivo o campos',
+  })
+  @UploadSpreadsheet({
+    fieldName: 'file',
+    maxSize: 10 * 1024 * 1024,
+  })
+  async importCSV(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() metadata: ImportTemplateMetadataDto,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No se proporcionó archivo CSV')
+    }
+
+    // Extract CSV content as string
+    const standardsCsv = file.buffer.toString('utf-8')
+
+    // Step 1: Process and validate file
+    const importResult =
+      await this.templateImportService.processCSVFile(standardsCsv)
+
+    // Step 2: If validation successful, save to database
+    if (importResult.success) {
+      const savedResult = await this.templateImportService.saveImportResult(
+        metadata,
+        importResult,
+      )
+      return {
+        success: true,
+        message: 'Plantilla importada exitosamente',
+        data: savedResult,
+        summary: importResult.summary,
+      }
+    }
+
+    // Step 3: Return validation errors
+    return {
+      success: false,
+      message: 'Errores de validación encontrados',
+      errors: {
+        standards: importResult.standards.errors,
+        crossValidation: importResult.crossValidationErrors,
+      },
+      summary: importResult.summary,
+    }
+  }
+
+  @Get('export/excel-template')
+  @ApiOperation({
+    summary: 'Descargar plantilla de Excel',
+    description:
+      'Descarga un archivo Excel vacío con la estructura correcta para importar estándares (1 hoja). Los metadatos de la plantilla se envían como campos de formulario.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Plantilla Excel generada (solo estándares)',
+  })
+  downloadExcelTemplate(@Res() res: Response) {
+    const buffer = this.templateImportService.generateExcelTemplate()
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=estandares-template.xlsx',
+    )
+    res.send(buffer)
+  }
+
+  @Get('export/csv-template')
+  @ApiOperation({
+    summary: 'Descargar plantilla CSV',
+    description:
+      'Descarga un archivo CSV vacío con la estructura correcta para importar estándares. Los metadatos de la plantilla se envían como campos de formulario.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Plantilla CSV generada (solo estándares)',
+  })
+  downloadCSVTemplate(@Res() res: Response) {
+    const standardsCsv = this.templateImportService.generateCSVTemplate()
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=estandares-template.csv',
+    )
+    res.send(standardsCsv)
   }
 }

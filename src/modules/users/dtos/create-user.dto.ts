@@ -11,109 +11,126 @@ import {
 } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Role, UserStatus } from '../entities/user.entity'
+import {
+  USER_CONSTRAINTS,
+  USER_VALIDATION_MESSAGES,
+} from '../constants/user-schema.constants'
 
 export class CreateUserDto {
   @ApiProperty({
     description: 'Nombres del usuario',
     example: 'Juan Carlos',
-    minLength: 2,
-    maxLength: 50,
+    minLength: USER_CONSTRAINTS.NAMES.MIN,
+    maxLength: USER_CONSTRAINTS.NAMES.MAX,
   })
   @IsString()
-  @MinLength(2, { message: 'Los nombres deben tener al menos 2 caracteres' })
-  @MaxLength(50, { message: 'Los nombres no pueden exceder 50 caracteres' })
+  @MinLength(USER_CONSTRAINTS.NAMES.MIN, {
+    message: USER_VALIDATION_MESSAGES.NAMES.MIN,
+  })
+  @MaxLength(USER_CONSTRAINTS.NAMES.MAX, {
+    message: USER_VALIDATION_MESSAGES.NAMES.MAX,
+  })
   names: string
 
   @ApiProperty({
     description: 'Apellidos del usuario',
     example: 'Pérez García',
-    minLength: 2,
-    maxLength: 50,
+    minLength: USER_CONSTRAINTS.LAST_NAMES.MIN,
+    maxLength: USER_CONSTRAINTS.LAST_NAMES.MAX,
   })
   @IsString()
-  @MinLength(2, {
-    message: 'Los apellidos deben tener al menos 2 caracteres',
+  @MinLength(USER_CONSTRAINTS.LAST_NAMES.MIN, {
+    message: USER_VALIDATION_MESSAGES.LAST_NAMES.MIN,
   })
-  @MaxLength(50, {
-    message: 'Los apellidos no pueden exceder 50 caracteres',
+  @MaxLength(USER_CONSTRAINTS.LAST_NAMES.MAX, {
+    message: USER_VALIDATION_MESSAGES.LAST_NAMES.MAX,
   })
   lastNames: string
 
   @ApiProperty({
     description: 'Email del usuario',
     example: 'juan.perez@example.com',
-    maxLength: 100,
+    maxLength: USER_CONSTRAINTS.EMAIL.MAX,
   })
-  @IsEmail({}, { message: 'Debe proporcionar un email válido' })
-  @MaxLength(100, { message: 'El email no puede exceder 100 caracteres' })
+  @IsEmail({}, { message: USER_VALIDATION_MESSAGES.EMAIL.INVALID })
+  @MaxLength(USER_CONSTRAINTS.EMAIL.MAX, {
+    message: USER_VALIDATION_MESSAGES.EMAIL.MAX,
+  })
   email: string
 
   @ApiProperty({
     description: 'Nombre de usuario (solo letras, números y guión bajo)',
     example: 'juan_perez',
-    minLength: 3,
-    maxLength: 30,
+    minLength: USER_CONSTRAINTS.USERNAME.MIN,
+    maxLength: USER_CONSTRAINTS.USERNAME.MAX,
   })
   @IsString()
-  @MinLength(3, {
-    message: 'El nombre de usuario debe tener al menos 3 caracteres',
+  @MinLength(USER_CONSTRAINTS.USERNAME.MIN, {
+    message: USER_VALIDATION_MESSAGES.USERNAME.MIN,
   })
-  @MaxLength(30, {
-    message: 'El nombre de usuario no puede exceder 30 caracteres',
+  @MaxLength(USER_CONSTRAINTS.USERNAME.MAX, {
+    message: USER_VALIDATION_MESSAGES.USERNAME.MAX,
   })
-  @Matches(/^[a-zA-Z0-9_]+$/, {
-    message:
-      'El nombre de usuario solo puede contener letras, números y guión bajo',
+  @Matches(USER_CONSTRAINTS.USERNAME.PATTERN, {
+    message: USER_VALIDATION_MESSAGES.USERNAME.PATTERN,
   })
   username: string
 
   @ApiProperty({
     description: 'Cédula de Identidad',
     example: '1234567-8',
-    minLength: 5,
-    maxLength: 15,
+    minLength: USER_CONSTRAINTS.CI.MIN,
+    maxLength: USER_CONSTRAINTS.CI.MAX,
   })
   @IsString()
-  @MinLength(5, { message: 'El CI debe tener al menos 5 caracteres' })
-  @MaxLength(15, { message: 'El CI no puede exceder 15 caracteres' })
-  @Matches(/^[0-9A-Za-z-]+$/, {
-    message: 'El CI solo puede contener números, letras y guiones',
+  @MinLength(USER_CONSTRAINTS.CI.MIN, {
+    message: USER_VALIDATION_MESSAGES.CI.MIN,
+  })
+  @MaxLength(USER_CONSTRAINTS.CI.MAX, {
+    message: USER_VALIDATION_MESSAGES.CI.MAX,
+  })
+  @Matches(USER_CONSTRAINTS.CI.PATTERN, {
+    message: USER_VALIDATION_MESSAGES.CI.PATTERN,
   })
   ci: string
 
   @ApiProperty({
     description: 'Contraseña del usuario',
     example: 'SecurePassword123',
-    minLength: 8,
-    maxLength: 100,
+    minLength: USER_CONSTRAINTS.PASSWORD.MIN,
+    maxLength: USER_CONSTRAINTS.PASSWORD.MAX,
   })
   @IsString()
-  @MinLength(8, {
-    message: 'La contraseña debe tener al menos 8 caracteres',
+  @MinLength(USER_CONSTRAINTS.PASSWORD.MIN, {
+    message: USER_VALIDATION_MESSAGES.PASSWORD.MIN,
   })
-  @MaxLength(100, {
-    message: 'La contraseña no puede exceder 100 caracteres',
+  @MaxLength(USER_CONSTRAINTS.PASSWORD.MAX, {
+    message: USER_VALIDATION_MESSAGES.PASSWORD.MAX,
   })
   password: string
 
   @ApiPropertyOptional({
     description: 'Teléfono de contacto',
     example: '+591 2 234 5678',
-    maxLength: 20,
+    maxLength: USER_CONSTRAINTS.PHONE.MAX,
   })
   @IsOptional()
   @IsString()
-  @MaxLength(20, { message: 'El teléfono no puede exceder 20 caracteres' })
+  @MaxLength(USER_CONSTRAINTS.PHONE.MAX, {
+    message: USER_VALIDATION_MESSAGES.PHONE.MAX,
+  })
   phone?: string
 
   @ApiPropertyOptional({
     description: 'Dirección del usuario',
     example: 'Av. 6 de Agosto #123, La Paz',
-    maxLength: 200,
+    maxLength: USER_CONSTRAINTS.ADDRESS.MAX,
   })
   @IsOptional()
   @IsString()
-  @MaxLength(200, { message: 'La dirección no puede exceder 200 caracteres' })
+  @MaxLength(USER_CONSTRAINTS.ADDRESS.MAX, {
+    message: USER_VALIDATION_MESSAGES.ADDRESS.MAX,
+  })
   address?: string
 
   @ApiProperty({

@@ -30,6 +30,10 @@ import { FindStandardsTreeUseCase } from './use-cases/standards/find-standards-t
 import { TemplatesController } from './controllers/templates.controller'
 import { StandardsController } from './controllers/standards.controller'
 
+// Services
+import { TemplateImportService } from './services/template-import.service'
+import { StandardsService } from './services/standards.service'
+
 @Module({
   imports: [TypeOrmModule.forFeature([TemplateEntity, StandardEntity])],
   controllers: [TemplatesController, StandardsController],
@@ -37,6 +41,10 @@ import { StandardsController } from './controllers/standards.controller'
     // Repositories
     TemplatesRepository,
     StandardsRepository,
+
+    // Services
+    TemplateImportService,
+    StandardsService,
 
     // Template Use Cases
     CreateTemplateUseCase,

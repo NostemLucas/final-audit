@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, IsNull } from 'typeorm'
 import { StandardEntity } from '../entities/standard.entity'
+import { TemplateEntity } from '../entities/template.entity'
 import { CreateStandardDto, UpdateStandardDto } from '../dtos'
 
 @Injectable()
@@ -13,9 +15,14 @@ export class StandardsService {
   constructor(
     @InjectRepository(StandardEntity)
     private readonly standardRepository: Repository<StandardEntity>,
+    @InjectRepository(TemplateEntity)
+    private readonly templateRepository: Repository<TemplateEntity>,
   ) {}
 
   async create(createStandardDto: CreateStandardDto): Promise<StandardEntity> {
+    // Validar que la plantilla sea editable
+    await this.validateTemplateIsEditable(createStandardDto.templateId)
+
     // Calcular el nivel automáticamente si tiene padre
     if (createStandardDto.parentId) {
       const parent = await this.findOne(createStandardDto.parentId)
@@ -119,6 +126,9 @@ export class StandardsService {
   ): Promise<StandardEntity> {
     const standard = await this.findOne(id)
 
+    // Validar que la plantilla sea editable
+    await this.validateTemplateIsEditable(standard.templateId)
+
     // Validar que no se establezca a sí mismo como padre
     if (
       updateStandardDto.parentId &&
@@ -147,6 +157,9 @@ export class StandardsService {
   async remove(id: string): Promise<void> {
     const standard = await this.findOne(id)
 
+    // Validar que la plantilla sea editable
+    await this.validateTemplateIsEditable(standard.templateId)
+
     // Verificar si tiene hijos
     if (standard.children && standard.children.length > 0) {
       throw new BadRequestException(
@@ -159,13 +172,44 @@ export class StandardsService {
 
   async deactivate(id: string): Promise<StandardEntity> {
     const standard = await this.findOne(id)
+
+    // Validar que la plantilla sea editable
+    await this.validateTemplateIsEditable(standard.templateId)
+
     standard.isActive = false
     return await this.standardRepository.save(standard)
   }
 
   async activate(id: string): Promise<StandardEntity> {
     const standard = await this.findOne(id)
+
+    // Validar que la plantilla sea editable
+    await this.validateTemplateIsEditable(standard.templateId)
+
     standard.isActive = true
     return await this.standardRepository.save(standard)
+  }
+
+  /**
+   * Valida que la plantilla esté en estado editable (draft)
+   * Lanza ForbiddenException si está publicada o archivada
+   */
+  private async validateTemplateIsEditable(templateId: string): Promise<void> {
+    const template = await this.templateRepository.findOne({
+      where: { id: templateId },
+    })
+
+    if (!template) {
+      throw new NotFoundException(
+        `Plantilla con ID ${templateId} no encontrada`,
+      )
+    }
+
+    if (!template.isEditable) {
+      throw new ForbiddenException(
+        `No se puede modificar esta plantilla. Estado actual: ${template.status}. ` +
+          `Para hacer cambios, debe clonar la plantilla creando una nueva versión en estado draft.`,
+      )
+    }
   }
 }

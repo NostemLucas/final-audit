@@ -362,12 +362,81 @@ describe('UserValidator', () => {
 
     it('should throw an error when roles are invalid', () => {
       // Arrange
-      const roles = ['INVALID_ROLE']
+      const roles = ['INVALID_ROLE' as Role]
 
       // Act & Assert
       expect(() => validator.validateRoles(roles)).toThrow(
-        'Invalid role: INVALID_ROLE',
+        'Rol inválido: INVALID_ROLE',
       )
+    })
+  })
+
+  describe('validateRoleTransition', () => {
+    it('should allow changing roles when user was not CLIENTE', () => {
+      // Arrange
+      const currentUser = {
+        roles: [Role.AUDITOR],
+      } as UserEntity
+      const newRoles = [Role.ADMIN, Role.GERENTE]
+
+      // Act & Assert
+      expect(() =>
+        validator.validateRoleTransition(currentUser, newRoles),
+      ).not.toThrow()
+    })
+
+    it('should allow keeping CLIENTE role', () => {
+      // Arrange
+      const currentUser = {
+        roles: [Role.CLIENTE],
+      } as UserEntity
+      const newRoles = [Role.CLIENTE]
+
+      // Act & Assert
+      expect(() =>
+        validator.validateRoleTransition(currentUser, newRoles),
+      ).not.toThrow()
+    })
+
+    it('should throw error when trying to change from CLIENTE to another role', () => {
+      // Arrange
+      const currentUser = {
+        roles: [Role.CLIENTE],
+      } as UserEntity
+      const newRoles = [Role.AUDITOR]
+
+      // Act & Assert
+      expect(() =>
+        validator.validateRoleTransition(currentUser, newRoles),
+      ).toThrow('No se puede cambiar el rol de un usuario CLIENTE')
+    })
+
+    it('should throw error when trying to add roles to CLIENTE user', () => {
+      // Arrange
+      const currentUser = {
+        roles: [Role.CLIENTE],
+      } as UserEntity
+      const newRoles = [Role.CLIENTE, Role.AUDITOR]
+
+      // Act & Assert
+      // Note: This will first fail validateRoles (CLIENTE exclusivity)
+      // but if we bypass that, validateRoleTransition would also block it
+      expect(() => validator.validateRoles(newRoles)).toThrow(
+        'El rol cliente no puede ser asignado junto con otros roles',
+      )
+    })
+
+    it('should allow changing to CLIENTE role from other roles', () => {
+      // Arrange
+      const currentUser = {
+        roles: [Role.AUDITOR, Role.GERENTE],
+      } as UserEntity
+      const newRoles = [Role.CLIENTE]
+
+      // Act & Assert
+      expect(() =>
+        validator.validateRoleTransition(currentUser, newRoles),
+      ).not.toThrow()
     })
   })
 })
