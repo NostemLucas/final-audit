@@ -23,7 +23,11 @@
  */
 
 import * as validator from 'class-validator'
-import { createValidator } from './helpers/create-validator.helper'
+import {
+  createValidator,
+  createMessage,
+  type ExtendedValidationOptions,
+} from './helpers/create-validator.helper'
 import { ValidationMessageEnum } from './constants/messages.constants'
 
 // Export types and utilities
@@ -227,10 +231,53 @@ export const IsDataURI = createValidator(
   ValidationMessageEnum.IS_DATA_URI,
 )
 
-export const IsEmail = createValidator(
-  validator.IsEmail,
-  ValidationMessageEnum.IS_EMAIL,
-)
+// IsEmail tiene sobrecarga de funciones, necesita wrapper especial
+export function IsEmail(
+  validationOptions?: ExtendedValidationOptions,
+): PropertyDecorator
+export function IsEmail(
+  options?: Record<string, unknown>,
+  validationOptions?: ExtendedValidationOptions,
+): PropertyDecorator
+export function IsEmail(
+  optionsOrValidation?: Record<string, unknown> | ExtendedValidationOptions,
+  validationOptions?: ExtendedValidationOptions,
+): PropertyDecorator {
+  // Determinar si el primer argumento es options o validationOptions
+  let options: Record<string, unknown> | undefined
+  let finalValidationOptions: ExtendedValidationOptions
+
+  if (validationOptions) {
+    // Dos argumentos: options + validationOptions
+    options = optionsOrValidation as Record<string, unknown>
+    finalValidationOptions = validationOptions
+  } else if (
+    optionsOrValidation &&
+    ('fieldName' in optionsOrValidation ||
+      'message' in optionsOrValidation ||
+      'groups' in optionsOrValidation ||
+      'always' in optionsOrValidation ||
+      'each' in optionsOrValidation)
+  ) {
+    // Un argumento: solo validationOptions
+    options = undefined
+    finalValidationOptions = optionsOrValidation as ExtendedValidationOptions
+  } else {
+    // Un argumento: solo options de email
+    options = optionsOrValidation as Record<string, unknown> | undefined
+    finalValidationOptions = {}
+  }
+
+  const { fieldName, ...restOptions } = finalValidationOptions
+
+  const finalOptions: validator.ValidationOptions = {
+    ...restOptions,
+    message:
+      restOptions.message || createMessage(ValidationMessageEnum.IS_EMAIL, fieldName),
+  }
+
+  return validator.IsEmail(options, finalOptions)
+}
 
 export const IsFullWidth = createValidator(
   validator.IsFullWidth,

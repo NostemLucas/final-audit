@@ -4,11 +4,16 @@
  * Single Source of Truth para los límites de longitud de campos de usuario.
  * Estos valores se usan en:
  * - Entity (TypeORM column length)
- * - DTOs (class-validator decorators)
+ * - DTOs (class-validator decorators con @core/i18n)
  * - Swagger documentation (ApiProperty)
  *
- * IMPORTANTE: Mantener sincronizados para evitar inconsistencias
- * entre validación de aplicación y restricciones de base de datos.
+ * Los mensajes de validación se generan automáticamente por el sistema i18n.
+ * No es necesario definir mensajes manualmente.
+ *
+ * Ejemplo:
+ *   @MinLength(USER_CONSTRAINTS.NAMES.MIN)
+ *   names: string
+ *   // Auto-genera: "El campo nombres debe tener al menos 2 caracteres"
  */
 export const USER_CONSTRAINTS = {
   NAMES: {
@@ -48,7 +53,14 @@ export const USER_CONSTRAINTS = {
 } as const
 
 /**
- * Mensajes de error estandarizados
+ * @deprecated Ya no es necesario definir mensajes manualmente.
+ * El sistema i18n genera mensajes automáticamente en español.
+ * Este objeto se mantiene por compatibilidad pero se puede eliminar.
+ *
+ * Para eliminar:
+ * 1. Verificar que todos los DTOs usen validadores de @core/i18n
+ * 2. Eliminar imports de USER_VALIDATION_MESSAGES
+ * 3. Eliminar este objeto
  */
 export const USER_VALIDATION_MESSAGES = {
   NAMES: {

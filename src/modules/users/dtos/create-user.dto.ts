@@ -1,3 +1,4 @@
+// ✅ Importar de @core/i18n para mensajes automáticos en español
 import {
   IsString,
   IsEmail,
@@ -8,13 +9,11 @@ import {
   MinLength,
   MaxLength,
   Matches,
-} from 'class-validator'
+} from '@core/i18n'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Role, UserStatus } from '../entities/user.entity'
-import {
-  USER_CONSTRAINTS,
-  USER_VALIDATION_MESSAGES,
-} from '../constants/user-schema.constants'
+// ✅ Solo importar constraints, NO validation messages (i18n los genera automáticamente)
+import { USER_CONSTRAINTS } from '../constants/user-schema.constants'
 
 export class CreateUserDto {
   @ApiProperty({
@@ -24,13 +23,13 @@ export class CreateUserDto {
     maxLength: USER_CONSTRAINTS.NAMES.MAX,
   })
   @IsString()
-  @MinLength(USER_CONSTRAINTS.NAMES.MIN, {
-    message: USER_VALIDATION_MESSAGES.NAMES.MIN,
-  })
-  @MaxLength(USER_CONSTRAINTS.NAMES.MAX, {
-    message: USER_VALIDATION_MESSAGES.NAMES.MAX,
-  })
+  @MinLength(USER_CONSTRAINTS.NAMES.MIN)
+  @MaxLength(USER_CONSTRAINTS.NAMES.MAX)
   names: string
+  // ✅ i18n genera automáticamente:
+  // - "El campo nombres debe ser una cadena de texto"
+  // - "El campo nombres debe tener al menos 2 caracteres"
+  // - "El campo nombres debe tener máximo 50 caracteres"
 
   @ApiProperty({
     description: 'Apellidos del usuario',
@@ -39,12 +38,8 @@ export class CreateUserDto {
     maxLength: USER_CONSTRAINTS.LAST_NAMES.MAX,
   })
   @IsString()
-  @MinLength(USER_CONSTRAINTS.LAST_NAMES.MIN, {
-    message: USER_VALIDATION_MESSAGES.LAST_NAMES.MIN,
-  })
-  @MaxLength(USER_CONSTRAINTS.LAST_NAMES.MAX, {
-    message: USER_VALIDATION_MESSAGES.LAST_NAMES.MAX,
-  })
+  @MinLength(USER_CONSTRAINTS.LAST_NAMES.MIN)
+  @MaxLength(USER_CONSTRAINTS.LAST_NAMES.MAX)
   lastNames: string
 
   @ApiProperty({
@@ -52,10 +47,8 @@ export class CreateUserDto {
     example: 'juan.perez@example.com',
     maxLength: USER_CONSTRAINTS.EMAIL.MAX,
   })
-  @IsEmail({}, { message: USER_VALIDATION_MESSAGES.EMAIL.INVALID })
-  @MaxLength(USER_CONSTRAINTS.EMAIL.MAX, {
-    message: USER_VALIDATION_MESSAGES.EMAIL.MAX,
-  })
+  @IsEmail()
+  @MaxLength(USER_CONSTRAINTS.EMAIL.MAX)
   email: string
 
   @ApiProperty({
@@ -65,15 +58,9 @@ export class CreateUserDto {
     maxLength: USER_CONSTRAINTS.USERNAME.MAX,
   })
   @IsString()
-  @MinLength(USER_CONSTRAINTS.USERNAME.MIN, {
-    message: USER_VALIDATION_MESSAGES.USERNAME.MIN,
-  })
-  @MaxLength(USER_CONSTRAINTS.USERNAME.MAX, {
-    message: USER_VALIDATION_MESSAGES.USERNAME.MAX,
-  })
-  @Matches(USER_CONSTRAINTS.USERNAME.PATTERN, {
-    message: USER_VALIDATION_MESSAGES.USERNAME.PATTERN,
-  })
+  @MinLength(USER_CONSTRAINTS.USERNAME.MIN)
+  @MaxLength(USER_CONSTRAINTS.USERNAME.MAX)
+  @Matches(USER_CONSTRAINTS.USERNAME.PATTERN)
   username: string
 
   @ApiProperty({
@@ -83,15 +70,9 @@ export class CreateUserDto {
     maxLength: USER_CONSTRAINTS.CI.MAX,
   })
   @IsString()
-  @MinLength(USER_CONSTRAINTS.CI.MIN, {
-    message: USER_VALIDATION_MESSAGES.CI.MIN,
-  })
-  @MaxLength(USER_CONSTRAINTS.CI.MAX, {
-    message: USER_VALIDATION_MESSAGES.CI.MAX,
-  })
-  @Matches(USER_CONSTRAINTS.CI.PATTERN, {
-    message: USER_VALIDATION_MESSAGES.CI.PATTERN,
-  })
+  @MinLength(USER_CONSTRAINTS.CI.MIN)
+  @MaxLength(USER_CONSTRAINTS.CI.MAX)
+  @Matches(USER_CONSTRAINTS.CI.PATTERN)
   ci: string
 
   @ApiProperty({
@@ -101,12 +82,8 @@ export class CreateUserDto {
     maxLength: USER_CONSTRAINTS.PASSWORD.MAX,
   })
   @IsString()
-  @MinLength(USER_CONSTRAINTS.PASSWORD.MIN, {
-    message: USER_VALIDATION_MESSAGES.PASSWORD.MIN,
-  })
-  @MaxLength(USER_CONSTRAINTS.PASSWORD.MAX, {
-    message: USER_VALIDATION_MESSAGES.PASSWORD.MAX,
-  })
+  @MinLength(USER_CONSTRAINTS.PASSWORD.MIN)
+  @MaxLength(USER_CONSTRAINTS.PASSWORD.MAX)
   password: string
 
   @ApiPropertyOptional({
@@ -116,9 +93,7 @@ export class CreateUserDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(USER_CONSTRAINTS.PHONE.MAX, {
-    message: USER_VALIDATION_MESSAGES.PHONE.MAX,
-  })
+  @MaxLength(USER_CONSTRAINTS.PHONE.MAX)
   phone?: string
 
   @ApiPropertyOptional({
@@ -128,9 +103,7 @@ export class CreateUserDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(USER_CONSTRAINTS.ADDRESS.MAX, {
-    message: USER_VALIDATION_MESSAGES.ADDRESS.MAX,
-  })
+  @MaxLength(USER_CONSTRAINTS.ADDRESS.MAX)
   address?: string
 
   @ApiProperty({
@@ -138,7 +111,7 @@ export class CreateUserDto {
       'ID de la organización a la que pertenece el usuario (requerido)',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @IsUUID('4', { message: 'El ID de organización debe ser un UUID válido' })
+  @IsUUID('4')
   organizationId: string
 
   @ApiProperty({
@@ -147,8 +120,8 @@ export class CreateUserDto {
     isArray: true,
     example: [Role.AUDITOR],
   })
-  @IsArray({ message: 'Los roles deben ser un array' })
-  @IsEnum(Role, { each: true, message: 'Cada rol debe ser válido' })
+  @IsArray()
+  @IsEnum(Role, { each: true })
   roles: Role[]
 
   @ApiPropertyOptional({
@@ -157,6 +130,6 @@ export class CreateUserDto {
     default: UserStatus.ACTIVE,
   })
   @IsOptional()
-  @IsEnum(UserStatus, { message: 'El estado debe ser válido' })
+  @IsEnum(UserStatus)
   status?: UserStatus
 }

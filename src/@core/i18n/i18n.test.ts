@@ -153,13 +153,21 @@ async function validateAndShow<T extends object>(
   transformOptions = { enableImplicitConversion: true },
 ): Promise<void> {
   console.log(chalk.cyan('  📋 Datos de entrada:'))
-  console.log(chalk.gray('    ' + JSON.stringify(data, null, 2).split('\n').join('\n    ')))
+  console.log(
+    chalk.gray(
+      '    ' + JSON.stringify(data, null, 2).split('\n').join('\n    '),
+    ),
+  )
   console.log('')
 
   const instance = plainToInstance(dto, data, transformOptions)
 
   console.log(chalk.cyan('  🔄 Después de transformers:'))
-  console.log(chalk.gray('    ' + JSON.stringify(instance, null, 2).split('\n').join('\n    ')))
+  console.log(
+    chalk.gray(
+      '    ' + JSON.stringify(instance, null, 2).split('\n').join('\n    '),
+    ),
+  )
   console.log('')
 
   const errors = await validate(instance)
@@ -171,6 +179,7 @@ async function validateAndShow<T extends object>(
     console.log('')
     errors.forEach((error: ValidationError) => {
       const field = error.property
+      console.log(chalk.yellow(`  - Campo: ${field}`))
       const constraints = error.constraints || {}
       Object.values(constraints).forEach((message) => {
         console.log(chalk.red(`    ✖ ${message}`))
@@ -183,7 +192,8 @@ const TEST_SCENARIOS: Record<string, TestScenario> = {
   translation: {
     name: 'Traducción Automática de Campos',
     icon: '🌐',
-    description: 'Demuestra cómo los nombres de campos se traducen automáticamente',
+    description:
+      'Demuestra cómo los nombres de campos se traducen automáticamente',
     async run() {
       console.log(chalk.white('\n  📝 Escenario: Datos inválidos\n'))
 
@@ -208,7 +218,8 @@ const TEST_SCENARIOS: Record<string, TestScenario> = {
   transformers: {
     name: 'Transformers de Datos',
     icon: '🔄',
-    description: 'Demuestra cómo los transformers convierten automáticamente tipos',
+    description:
+      'Demuestra cómo los transformers convierten automáticamente tipos',
     async run() {
       console.log(chalk.white('\n  📝 Escenario: Strings → Tipos nativos\n'))
 
@@ -218,7 +229,9 @@ const TEST_SCENARIOS: Record<string, TestScenario> = {
         tags: 'tag1,tag2,tag3', // String → Array
       })
 
-      console.log(chalk.white('\n  📝 Escenario: Valores booleanos en español\n'))
+      console.log(
+        chalk.white('\n  📝 Escenario: Valores booleanos en español\n'),
+      )
 
       await validateAndShow(ConfigDto, {
         enabled: 'si', // "si" → true
@@ -226,7 +239,9 @@ const TEST_SCENARIOS: Record<string, TestScenario> = {
         tags: ['production', 'active'],
       })
 
-      console.log(chalk.white('\n  📝 Escenario: Validación numérica (fuera de rango)\n'))
+      console.log(
+        chalk.white('\n  📝 Escenario: Validación numérica (fuera de rango)\n'),
+      )
 
       await validateAndShow(ConfigDto, {
         enabled: true,
@@ -331,9 +346,7 @@ const TEST_SCENARIOS: Record<string, TestScenario> = {
     description: 'Demuestra validación con expresiones regulares',
     async run() {
       console.log(
-        chalk.white(
-          '\n  📝 Escenario: Username con caracteres inválidos\n',
-        ),
+        chalk.white('\n  📝 Escenario: Username con caracteres inválidos\n'),
       )
       console.log(
         chalk.gray(
@@ -395,7 +408,9 @@ async function runSingleScenario(name: string) {
  */
 async function runAllScenarios() {
   console.log(chalk.cyan('\n' + '═'.repeat(70)))
-  console.log(chalk.bold.cyan('  🌐 Sistema i18n - Probando Todos los Escenarios'))
+  console.log(
+    chalk.bold.cyan('  🌐 Sistema i18n - Probando Todos los Escenarios'),
+  )
   console.log(chalk.cyan('═'.repeat(70) + '\n'))
 
   let successCount = 0
@@ -403,6 +418,7 @@ async function runAllScenarios() {
 
   for (const [name, scenario] of Object.entries(TEST_SCENARIOS)) {
     console.log(chalk.cyan('━'.repeat(70)))
+    console.log(name)
     console.log(chalk.bold.white(`${scenario.icon} ${scenario.name}`))
     console.log(chalk.gray(`${scenario.description}`))
     console.log(chalk.cyan('━'.repeat(70)))
@@ -434,7 +450,9 @@ async function runAllScenarios() {
 
   console.log(chalk.yellow('💡 Tips:'))
   console.log(
-    chalk.white('  - Agrega traducciones en: constants/field-names.constants.ts'),
+    chalk.white(
+      '  - Agrega traducciones en: constants/field-names.constants.ts',
+    ),
   )
   console.log(
     chalk.white('  - Los transformers se aplican ANTES de la validación'),
@@ -478,13 +496,17 @@ function showHelp() {
   console.log(chalk.white('     names → nombres, email → correo electrónico'))
   console.log('')
   console.log(chalk.white('  🔄 Transformers automáticos'))
-  console.log(chalk.white('     "true" → true, "42" → 42, "a,b,c" → ["a","b","c"]'))
+  console.log(
+    chalk.white('     "true" → true, "42" → 42, "a,b,c" → ["a","b","c"]'),
+  )
   console.log('')
   console.log(chalk.white('  ✏️  Nombres de campo personalizados'))
   console.log(chalk.white('     { fieldName: "código del producto" }'))
   console.log('')
   console.log(chalk.white('  📝 Mensajes en español'))
-  console.log(chalk.white('     "El campo nombres debe tener al menos 2 caracteres"'))
+  console.log(
+    chalk.white('     "El campo nombres debe tener al menos 2 caracteres"'),
+  )
   console.log('')
 
   console.log(chalk.cyan('═'.repeat(70) + '\n'))
@@ -532,4 +554,6 @@ async function main() {
 }
 
 // Ejecutar
+
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
 main()
