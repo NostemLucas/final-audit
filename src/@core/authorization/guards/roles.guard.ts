@@ -1,8 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { ROLES_KEY } from '../decorators/roles.decorator'
-import { Role } from '../../users/entities/user.entity'
-import type { JwtPayload } from '../interfaces'
+import type { Role } from '../types'
 
 /**
  * Roles Guard
@@ -11,9 +10,10 @@ import type { JwtPayload } from '../interfaces'
  * Para requerir roles específicos, usar el decorador @Roles()
  *
  * Este guard:
- * - Se aplica después de JwtAuthGuard
+ * - Se aplica después de JwtAuthGuard (requiere usuario autenticado)
  * - Verifica que el usuario tenga al menos uno de los roles requeridos
- * - Permite acceso si no se especifican roles
+ * - Permite acceso si no se especifican roles (@Roles no está presente)
+ * - Es independiente del dominio (no depende de enum específico de users)
  *
  * @see Roles - Decorator para especificar roles requeridos
  */
@@ -29,6 +29,7 @@ export class RolesGuard implements CanActivate {
    */
   canActivate(context: ExecutionContext): boolean {
     // Obtener roles requeridos del decorador @Roles()
+    // Busca en el handler (método) y en la clase (controller)
     const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -40,13 +41,20 @@ export class RolesGuard implements CanActivate {
     }
 
     // Obtener usuario del request (inyectado por JwtStrategy)
-    const { user } = context.switchToHttp().getRequest<{ user: JwtPayload }>()
+    // user.roles puede ser string[] o enum[], por eso convertimos a strings
+    const { user } = context
+      .switchToHttp()
+      .getRequest<{ user?: { roles?: string[] } }>()
 
     if (!user || !user.roles) {
       return false
     }
 
+    // Convertir ambos arrays a strings para comparación segura
+    const userRoles = user.roles.map((r) => String(r))
+    const requiredRoleStrings = requiredRoles.map((r) => String(r))
+
     // Verificar si el usuario tiene alguno de los roles requeridos
-    return requiredRoles.some((role) => user.roles.includes(role))
+    return requiredRoleStrings.some((role) => userRoles.includes(role))
   }
 }

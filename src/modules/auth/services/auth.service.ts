@@ -1,35 +1,43 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { LoginUseCase } from '../use-cases/login/login.use-case'
 import { RefreshTokenUseCase } from '../use-cases/refresh-token/refresh-token.use-case'
 import { LogoutUseCase } from '../use-cases/logout/logout.use-case'
+import {
+  RequestResetPasswordUseCase,
+  ResetPasswordUseCase,
+} from '../use-cases/password-reset'
+import {
+  Generate2FACodeUseCase,
+  Verify2FACodeUseCase,
+  Resend2FACodeUseCase,
+} from '../use-cases/two-factor'
 import type { LoginDto } from '../dtos'
 import type { LoginResponseDto } from '../dtos/login-response.dto'
-import { ResetPasswordTokenService } from './reset-password-token.service'
-import { TwoFactorTokenService } from './two-factor-token.service'
-import { UsersRepository } from '../../users/repositories/users.repository'
-import { EmailService } from '@core/email'
-import * as bcrypt from 'bcrypt'
 
 /**
  * Servicio de autenticación (Facade)
  *
  * Actúa como fachada para los use cases de autenticación
  * Los controllers llaman a este service, que delega a los use cases
+ *
+ * Este servicio NO contiene lógica de negocio, solo delegación
  */
 @Injectable()
 export class AuthService {
   constructor(
+    // Use cases de login/logout/refresh
     private readonly loginUseCase: LoginUseCase,
     private readonly refreshTokenUseCase: RefreshTokenUseCase,
     private readonly logoutUseCase: LogoutUseCase,
-    private readonly resetPasswordTokenService: ResetPasswordTokenService,
-    private readonly twoFactorTokenService: TwoFactorTokenService,
-    private readonly usersRepository: UsersRepository,
-    private readonly emailService: EmailService,
+
+    // Use cases de password reset
+    private readonly requestResetPasswordUseCase: RequestResetPasswordUseCase,
+    private readonly resetPasswordUseCase: ResetPasswordUseCase,
+
+    // Use cases de 2FA
+    private readonly generate2FACodeUseCase: Generate2FACodeUseCase,
+    private readonly verify2FACodeUseCase: Verify2FACodeUseCase,
+    private readonly resend2FACodeUseCase: Resend2FACodeUseCase,
   ) {}
 
   /**
@@ -78,51 +86,19 @@ export class AuthService {
   /**
    * Solicitar reset de contraseña
    *
-   * 1. Verifica que el email existe
-   * 2. Genera token de reset (JWT + Redis)
-   * 3. Envía email con link de reset
+   * Delega al use case correspondiente
    *
    * @param email - Email del usuario
    * @returns Mensaje de confirmación
    */
   async requestResetPassword(email: string): Promise<{ message: string }> {
-    // Buscar usuario por email
-    const user = await this.usersRepository.findByEmail(email)
-
-    if (!user) {
-      // Por seguridad, no revelamos si el email existe o no
-      return {
-        message:
-          'Si el email existe, recibirás un link para resetear tu contraseña',
-      }
-    }
-
-    // Generar token de reset
-    const token = await this.resetPasswordTokenService.generateToken(user.id)
-
-    // Construir URL de reset (frontend)
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`
-
-    // Enviar email
-    await this.emailService.sendResetPasswordEmail({
-      to: user.email,
-      userName: user.username,
-      resetLink,
-      expiresInMinutes: 60, // 1 hora
-    })
-
-    return {
-      message:
-        'Si el email existe, recibirás un link para resetear tu contraseña',
-    }
+    return await this.requestResetPasswordUseCase.execute(email)
   }
 
   /**
    * Resetear contraseña usando token
    *
-   * 1. Valida el token (JWT + Redis)
-   * 2. Actualiza la contraseña
-   * 3. Revoca el token y todos los refresh tokens del usuario
+   * Delega al use case correspondiente
    *
    * @param token - Token de reset
    * @param newPassword - Nueva contraseña
@@ -132,35 +108,7 @@ export class AuthService {
     token: string,
     newPassword: string,
   ): Promise<{ message: string }> {
-    // Validar token
-    const userId = await this.resetPasswordTokenService.validateToken(token)
-
-    if (!userId) {
-      throw new BadRequestException('Token inválido o expirado')
-    }
-
-    // Buscar usuario
-    const user = await this.usersRepository.findById(userId)
-
-    if (!user) {
-      throw new NotFoundException('Usuario no encontrado')
-    }
-
-    // Hash de la nueva contraseña
-    const hashedPassword = await bcrypt.hash(newPassword, 10)
-
-    // Actualizar contraseña
-    await this.usersRepository.update(user.id, { password: hashedPassword })
-
-    // Revocar token usado
-    await this.resetPasswordTokenService.revokeToken(token)
-
-    // Revocar todos los refresh tokens (seguridad: cerrar todas las sesiones)
-    await this.resetPasswordTokenService.revokeUserTokens(userId)
-
-    return {
-      message: 'Contraseña actualizada exitosamente',
-    }
+    return await this.resetPasswordUseCase.execute(token, newPassword)
   }
 
   // ========================================
@@ -170,11 +118,7 @@ export class AuthService {
   /**
    * Generar código 2FA y enviarlo por email
    *
-   * 1. Verifica que el usuario existe
-   * 2. Genera código numérico (6 dígitos)
-   * 3. Almacena en Redis con TTL
-   * 4. Envía email con el código
-   * 5. Devuelve token JWT para validación
+   * Delega al use case correspondiente
    *
    * @param identifier - Email o userId
    * @returns Token JWT y mensaje de confirmación
@@ -182,42 +126,13 @@ export class AuthService {
   async generate2FACode(
     identifier: string,
   ): Promise<{ token: string; message: string }> {
-    // Buscar usuario por email o ID
-    let user = await this.usersRepository.findByEmail(identifier)
-
-    if (!user) {
-      user = await this.usersRepository.findById(identifier)
-    }
-
-    if (!user) {
-      throw new NotFoundException('Usuario no encontrado')
-    }
-
-    // Generar código 2FA
-    const { code, token } = await this.twoFactorTokenService.generateCode(
-      user.id,
-    )
-
-    // Enviar código por email
-    await this.emailService.sendTwoFactorCode({
-      to: user.email,
-      userName: user.username,
-      code,
-      expiresInMinutes: 5, // 5 minutos
-    })
-
-    return {
-      token,
-      message: 'Código 2FA enviado al email registrado',
-    }
+    return await this.generate2FACodeUseCase.execute(identifier)
   }
 
   /**
    * Verificar código 2FA
    *
-   * 1. Valida el código contra Redis
-   * 2. Valida el JWT (opcional)
-   * 3. Elimina el código de Redis (un solo uso)
+   * Delega al use case correspondiente
    *
    * @param userId - ID del usuario
    * @param code - Código numérico
@@ -229,32 +144,13 @@ export class AuthService {
     code: string,
     token?: string,
   ): Promise<{ valid: boolean; message: string }> {
-    // Validar código
-    const isValid = await this.twoFactorTokenService.validateCode(
-      userId,
-      code,
-      token,
-    )
-
-    if (!isValid) {
-      return {
-        valid: false,
-        message: 'Código inválido o expirado',
-      }
-    }
-
-    return {
-      valid: true,
-      message: 'Código verificado exitosamente',
-    }
+    return await this.verify2FACodeUseCase.execute(userId, code, token)
   }
 
   /**
    * Reenviar código 2FA
    *
-   * 1. Revoca código anterior (si existe)
-   * 2. Genera nuevo código
-   * 3. Lo envía por email
+   * Delega al use case correspondiente
    *
    * @param userId - ID del usuario
    * @returns Nuevo token JWT
@@ -262,32 +158,6 @@ export class AuthService {
   async resend2FACode(
     userId: string,
   ): Promise<{ token: string; message: string }> {
-    // Buscar usuario
-    const user = await this.usersRepository.findById(userId)
-
-    if (!user) {
-      throw new NotFoundException('Usuario no encontrado')
-    }
-
-    // Revocar códigos anteriores
-    await this.twoFactorTokenService.revokeAllUserCodes(userId)
-
-    // Generar nuevo código
-    const { code, token } = await this.twoFactorTokenService.generateCode(
-      user.id,
-    )
-
-    // Enviar código por email
-    await this.emailService.sendTwoFactorCode({
-      to: user.email,
-      userName: user.username,
-      code,
-      expiresInMinutes: 5,
-    })
-
-    return {
-      token,
-      message: 'Nuevo código 2FA enviado',
-    }
+    return await this.resend2FACodeUseCase.execute(userId)
   }
 }

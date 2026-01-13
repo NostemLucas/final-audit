@@ -43,7 +43,7 @@ export class ResetPasswordTokenService {
       '1h',
     )
 
-    const secret = configService.get<string>('RESET_PASSWORD_JWT_SECRET')
+    const secret = this.configService.get<string>('RESET_PASSWORD_JWT_SECRET')
     if (!secret) {
       throw new Error(
         'RESET_PASSWORD_JWT_SECRET is required. Please set it in your .env file.',

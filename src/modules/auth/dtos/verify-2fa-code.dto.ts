@@ -1,5 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsString, IsNotEmpty, Length, Matches } from 'class-validator'
+import {
+  IsString,
+  IsNotEmpty,
+  Length,
+  Matches,
+  MaxLength,
+  MinLength,
+  IsOptional,
+} from 'class-validator'
+import { TWO_FACTOR_CONSTRAINTS } from '../constants'
 
 /**
  * DTO para verificar un código 2FA
@@ -19,21 +28,25 @@ export class Verify2FACodeDto {
   @ApiProperty({
     description: 'ID del usuario',
     example: '550e8400-e29b-41d4-a716-446655440000',
+    maxLength: TWO_FACTOR_CONSTRAINTS.IDENTIFIER.MAX,
   })
   @IsString({ message: 'El userId debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'El userId es requerido' })
+  @MaxLength(TWO_FACTOR_CONSTRAINTS.IDENTIFIER.MAX)
   userId: string
 
   @ApiProperty({
-    description: 'Código numérico de 6 dígitos',
+    description: `Código numérico de ${TWO_FACTOR_CONSTRAINTS.CODE.LENGTH} dígitos`,
     example: '123456',
-    minLength: 6,
-    maxLength: 6,
+    minLength: TWO_FACTOR_CONSTRAINTS.CODE.LENGTH,
+    maxLength: TWO_FACTOR_CONSTRAINTS.CODE.LENGTH,
   })
   @IsString({ message: 'El código debe ser una cadena de texto' })
-  @Length(6, 6, { message: 'El código debe tener exactamente 6 dígitos' })
-  @Matches(/^\d{6}$/, {
-    message: 'El código debe contener solo números',
+  @Length(TWO_FACTOR_CONSTRAINTS.CODE.LENGTH, TWO_FACTOR_CONSTRAINTS.CODE.LENGTH, {
+    message: `El código debe tener exactamente ${TWO_FACTOR_CONSTRAINTS.CODE.LENGTH} dígitos`,
+  })
+  @Matches(TWO_FACTOR_CONSTRAINTS.CODE.PATTERN, {
+    message: TWO_FACTOR_CONSTRAINTS.CODE.MESSAGE,
   })
   @IsNotEmpty({ message: 'El código es requerido' })
   code: string
@@ -42,7 +55,12 @@ export class Verify2FACodeDto {
     description: 'Token JWT opcional para validación adicional',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
     required: false,
+    minLength: TWO_FACTOR_CONSTRAINTS.TOKEN.MIN,
+    maxLength: TWO_FACTOR_CONSTRAINTS.TOKEN.MAX,
   })
+  @IsOptional()
   @IsString({ message: 'El token debe ser una cadena de texto' })
+  @MinLength(TWO_FACTOR_CONSTRAINTS.TOKEN.MIN)
+  @MaxLength(TWO_FACTOR_CONSTRAINTS.TOKEN.MAX)
   token?: string
 }

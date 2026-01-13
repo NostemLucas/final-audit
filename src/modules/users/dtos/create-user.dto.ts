@@ -1,4 +1,3 @@
-// ✅ Importar de @core/i18n para mensajes automáticos en español
 import {
   IsString,
   IsEmail,
@@ -12,7 +11,6 @@ import {
 } from '@core/i18n'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Role, UserStatus } from '../entities/user.entity'
-// ✅ Solo importar constraints, NO validation messages (i18n los genera automáticamente)
 import { USER_CONSTRAINTS } from '../constants/user-schema.constants'
 
 export class CreateUserDto {
@@ -26,10 +24,6 @@ export class CreateUserDto {
   @MinLength(USER_CONSTRAINTS.NAMES.MIN)
   @MaxLength(USER_CONSTRAINTS.NAMES.MAX)
   names: string
-  // ✅ i18n genera automáticamente:
-  // - "El campo nombres debe ser una cadena de texto"
-  // - "El campo nombres debe tener al menos 2 caracteres"
-  // - "El campo nombres debe tener máximo 50 caracteres"
 
   @ApiProperty({
     description: 'Apellidos del usuario',

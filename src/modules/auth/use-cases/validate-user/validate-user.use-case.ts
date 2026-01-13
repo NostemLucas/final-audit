@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { USERS_REPOSITORY } from '../../../users/tokens'
 import type { IUsersRepository } from '../../../users/repositories'
-import { UserFactory } from '../../../users/factories/user.factory'
+import { PasswordHashService } from '@core/security'
 import { UserEntity, UserStatus } from '../../../users/entities/user.entity'
 import {
   InvalidCredentialsException,
@@ -23,7 +23,7 @@ export class ValidateUserUseCase {
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: IUsersRepository,
-    private readonly userFactory: UserFactory,
+    private readonly passwordHashService: PasswordHashService,
   ) {}
 
   /**
@@ -50,7 +50,7 @@ export class ValidateUserUseCase {
     }
 
     // 2. Verificar contraseña
-    const isPasswordValid = this.userFactory.verifyPassword(
+    const isPasswordValid = await this.passwordHashService.verify(
       password,
       user.password,
     )

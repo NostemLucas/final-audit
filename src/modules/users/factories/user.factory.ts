@@ -1,20 +1,20 @@
 import { Injectable } from '@nestjs/common'
-import * as bcrypt from 'bcrypt'
+import { PasswordHashService } from '@core/security'
 import { UserEntity, UserStatus } from '../entities/user.entity'
 import { CreateUserDto, UpdateUserDto } from '../dtos'
 
 @Injectable()
 export class UserFactory {
-  private readonly SALT_ROUNDS = 10
+  constructor(private readonly passwordHashService: PasswordHashService) {}
 
   /**
    * Crea una nueva entidad UserEntity desde un CreateUserDto
-   * Hashea la contraseña automáticamente usando bcrypt
+   * Hashea la contraseña automáticamente usando PasswordHashService
    *
    * @param dto - Datos del usuario a crear
-   * @returns Nueva instancia de UserEntity (sin persistir)
+   * @returns Promise con nueva instancia de UserEntity (sin persistir)
    */
-  createFromDto(dto: CreateUserDto): UserEntity {
+  async createFromDto(dto: CreateUserDto): Promise<UserEntity> {
     const user = new UserEntity()
 
     user.names = dto.names
@@ -22,7 +22,7 @@ export class UserFactory {
     user.email = dto.email.toLowerCase()
     user.username = dto.username.toLowerCase()
     user.ci = dto.ci
-    user.password = this.hashPassword(dto.password)
+    user.password = await this.passwordHashService.hash(dto.password)
     user.phone = dto.phone ?? null
     user.address = dto.address ?? null
     user.organizationId = dto.organizationId
@@ -53,27 +53,5 @@ export class UserFactory {
     if (dto.status !== undefined) user.status = dto.status
 
     return user
-  }
-
-  /**
-   * Hashea una contraseña usando bcrypt de forma sincrónica
-   *
-   * @param password - Contraseña en texto plano
-   * @returns Hash de la contraseña
-   */
-  private hashPassword(password: string): string {
-    return bcrypt.hashSync(password, this.SALT_ROUNDS)
-  }
-
-  /**
-   * Verifica si una contraseña coincide con su hash
-   * Útil para autenticación
-   *
-   * @param password - Contraseña en texto plano
-   * @param hash - Hash almacenado
-   * @returns true si la contraseña coincide
-   */
-  verifyPassword(password: string, hash: string): boolean {
-    return bcrypt.compareSync(password, hash)
   }
 }

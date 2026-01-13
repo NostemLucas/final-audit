@@ -7,6 +7,7 @@ import {
   StartupLogger,
 } from './loggers'
 import { UserContext } from './types'
+import { JwtPayload } from 'src/modules/auth'
 
 @Injectable()
 export class LoggerService implements NestLoggerService {
@@ -152,17 +153,18 @@ export class LoggerService implements NestLoggerService {
       return this.normalizeUserContext(userContext)
     }
 
-    if (req.user) {
+    const user = req.user as unknown as JwtPayload | undefined
+
+    // 4. Verificamos que el usuario exista y tenga los datos mínimos
+    if (user && user.sub) {
       return {
-        userId: req.user.sub,
-        userEmail: req.user.email,
-        userName: req.user.username,
+        userId: user.sub,
+        userEmail: user.email,
+        userName: user.username,
       }
     }
-
     return undefined
   }
-
   private normalizeUserContext(
     partial: Partial<UserContext>,
   ): UserContext | undefined {

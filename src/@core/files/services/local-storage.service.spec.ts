@@ -38,7 +38,7 @@ describe('LocalStorageService', () => {
         if (key === 'UPLOADS_DIR') return mockUploadsDir
         if (key === 'APP_URL') return mockAppUrl
         return undefined
-      }),
+      }) as any,
     }
 
     const mockLoggerService: Partial<jest.Mocked<LoggerService>> = {

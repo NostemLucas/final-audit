@@ -69,7 +69,6 @@ export class UserEntity extends BaseEntity {
   })
   status: UserStatus
 
-  // Requerido: Todo usuario debe pertenecer a una organización
   @Column({ type: 'uuid', nullable: false })
   organizationId: string
 

@@ -97,6 +97,7 @@ export class FileValidator {
         }
       } catch (_error) {
         errors.push('Error al procesar la imagen')
+        console.log(_error)
       }
     }
 

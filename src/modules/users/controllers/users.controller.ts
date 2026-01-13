@@ -12,9 +12,18 @@ import {
   BadRequestException,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
+import {
+  ApiCreateResponses,
+  ApiReadResponses,
+  ApiUpdateResponses,
+  ApiOkResponse,
+  ApiNotFoundResponse,
+  ApiStandardResponses,
+} from '@core/swagger'
 
 import { UsersService } from '../services/users.service'
 import { CreateUserDto, UpdateUserDto } from '../dtos'
+import { UserEntity } from '../entities/user.entity'
 import { UploadAvatar } from '@core/files'
 
 @ApiTags('users')
@@ -29,11 +38,10 @@ export class UsersController {
     description:
       'Crea un nuevo usuario con sus datos básicos. La contraseña se hashea automáticamente con bcrypt.',
   })
-  @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
-  @ApiResponse({
-    status: 409,
-    description: 'Ya existe un usuario con ese email, username o CI',
-  })
+  @ApiCreateResponses(
+    UserEntity,
+    'Ya existe un usuario con ese email, username o CI',
+  )
   async create(@Body() createUserDto: CreateUserDto) {
     return await this.usersService.create(createUserDto)
   }

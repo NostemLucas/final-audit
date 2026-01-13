@@ -5,7 +5,7 @@ import { TokenStorageService, REDIS_PREFIXES } from '@core/cache'
 import { JwtTokenHelper } from '../helpers'
 
 export interface TwoFactorPayload {
-  sub: string // userId
+  sub: string
   code: string
   type: '2fa'
 }

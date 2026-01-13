@@ -35,7 +35,7 @@ export class CreateUserUseCase {
       dto.ci,
     )
     await this.validator.validateOrganizationExists(dto.organizationId)
-    const user = this.userFactory.createFromDto(dto)
+    const user = await this.userFactory.createFromDto(dto)
     return await this.usersRepository.save(user)
   }
 }

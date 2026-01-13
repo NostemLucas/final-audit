@@ -4,7 +4,6 @@ import { JwtModule } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
 import { APP_GUARD } from '@nestjs/core'
 import type * as ms from 'ms'
-import { UsersModule } from '../users/users.module'
 import { AuthController } from './controllers'
 import {
   TokensService,
@@ -17,47 +16,23 @@ import {
   LoginUseCase,
   RefreshTokenUseCase,
   LogoutUseCase,
+  RequestResetPasswordUseCase,
+  ResetPasswordUseCase,
+  Generate2FACodeUseCase,
+  Verify2FACodeUseCase,
+  Resend2FACodeUseCase,
 } from './use-cases'
 import { LocalStrategy, JwtStrategy, JwtRefreshStrategy } from './strategies'
-import { JwtAuthGuard, RolesGuard } from './guards'
+import { JwtAuthGuard } from './guards'
+import { RolesGuard } from '@core/authorization'
 import { JwtTokenHelper } from './helpers'
 
-/**
- * AuthModule
- *
- * Módulo de autenticación completo con:
- * - JWT con access tokens (15min) y refresh tokens (7 días)
- * - HTTP-only cookies para refresh tokens
- * - Token rotation en cada refresh
- * - Blacklist con Redis para logout
- * - Reset password tokens (Redis/JWT/Both)
- * - 2FA codes (Redis/JWT/Both)
- * - Guards globales para protección de rutas
- * - Decorators para rutas públicas y control de roles
- *
- * @example
- * ```typescript
- * // Ruta pública
- * @Public()
- * @Get('stats')
- * async getStats() { }
- *
- * // Ruta protegida
- * @Get('me')
- * async getMe(@GetUser() user: JwtPayload) { }
- *
- * // Ruta con roles
- * @Roles(Role.ADMIN, Role.GERENTE)
- * @Post('users')
- * async createUser(@Body() dto: CreateUserDto) { }
- * ```
- */
 @Module({
   imports: [
     // Configuración de Passport
     PassportModule.register({
       defaultStrategy: 'jwt',
-      session: false, // Stateless authentication
+      session: false,
     }),
 
     // Configuración de JWT para access tokens
@@ -86,9 +61,6 @@ import { JwtTokenHelper } from './helpers'
         }
       },
     }),
-
-    // UsersModule para acceder a UserRepository
-    UsersModule,
   ],
 
   controllers: [AuthController],
@@ -110,10 +82,20 @@ import { JwtTokenHelper } from './helpers'
     // ========================================
     // Use Cases
     // ========================================
+    // Login/Logout/Refresh
     ValidateUserUseCase,
     LoginUseCase,
     RefreshTokenUseCase,
     LogoutUseCase,
+
+    // Password Reset
+    RequestResetPasswordUseCase,
+    ResetPasswordUseCase,
+
+    // Two-Factor Authentication
+    Generate2FACodeUseCase,
+    Verify2FACodeUseCase,
+    Resend2FACodeUseCase,
 
     // ========================================
     // Passport Strategies
@@ -123,10 +105,10 @@ import { JwtTokenHelper } from './helpers'
     JwtRefreshStrategy,
 
     // ========================================
-    // Guards (para poder exportar y usar globalmente)
+    // Guards
     // ========================================
-    JwtAuthGuard, // Registrado como provider normal
-    RolesGuard, // Registrado como provider normal
+    JwtAuthGuard, // Guard de autenticación JWT (local al módulo auth)
+    RolesGuard, // Guard de autorización (importado desde @core/authorization)
 
     // ========================================
     // Global Guards (registrados como APP_GUARD)
