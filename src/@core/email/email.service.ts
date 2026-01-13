@@ -3,6 +3,7 @@ import { MailerService } from '@nestjs-modules/mailer'
 import { ConfigService } from '@nestjs/config'
 import { LoggerService } from '@core/logger'
 import * as nodemailer from 'nodemailer'
+import * as path from 'path'
 import {
   SendEmailOptions,
   TwoFactorEmailData,
@@ -10,6 +11,7 @@ import {
   WelcomeEmailData,
   VerifyEmailData,
 } from './interfaces'
+import { ImageHelper } from './utils'
 
 /**
  * Servicio para envío de emails con templates HTML
@@ -25,6 +27,8 @@ export class EmailService {
   private readonly fromEmail: string
   private readonly fromName: string
   private readonly appName: string
+  private readonly logoBase64: string | null
+  private readonly logoUrl: string | null
 
   constructor(
     private readonly logger: LoggerService,
@@ -35,6 +39,27 @@ export class EmailService {
       this.configService.get<string>('MAIL_FROM') || 'noreply@audit2.com'
     this.fromName = this.configService.get<string>('MAIL_FROM_NAME') || 'Audit2'
     this.appName = this.configService.get<string>('APP_NAME') || 'Audit2'
+
+    // Opción 1: Logo Base64 (recomendado)
+    // Buscar logo en assets/images/logo.png
+    const logoPath = path.join(process.cwd(), 'assets', 'images', 'logo.png')
+
+    if (ImageHelper.imageExists(logoPath)) {
+      this.logoBase64 = ImageHelper.imageToBase64(logoPath)
+      const size = ImageHelper.getImageSizeFormatted(logoPath)
+      this.logger.log(`✅ Logo cargado para emails (${size})`)
+    } else {
+      this.logoBase64 = null
+      this.logger.warn(
+        `⚠️  Logo no encontrado en: ${logoPath}. Los emails no tendrán logo.`,
+      )
+      this.logger.warn(
+        `   Coloca tu logo en: assets/images/logo.png para que aparezca en los emails.`,
+      )
+    }
+
+    // Opción 2: Logo por URL (alternativa)
+    this.logoUrl = this.configService.get<string>('LOGO_URL') || null
   }
 
   /**
@@ -52,6 +77,9 @@ export class EmailService {
           ...options.context,
           appName: this.appName,
           currentYear: new Date().getFullYear(),
+          // Logos disponibles en todos los templates
+          logoBase64: this.logoBase64,
+          logoUrl: this.logoUrl,
         },
       })
 

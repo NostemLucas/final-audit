@@ -20,6 +20,7 @@ import {
 } from './use-cases'
 import { LocalStrategy, JwtStrategy, JwtRefreshStrategy } from './strategies'
 import { JwtAuthGuard, RolesGuard } from './guards'
+import { JwtTokenHelper } from './helpers'
 
 /**
  * AuthModule
@@ -94,6 +95,11 @@ import { JwtAuthGuard, RolesGuard } from './guards'
 
   providers: [
     // ========================================
+    // Helpers
+    // ========================================
+    JwtTokenHelper,
+
+    // ========================================
     // Services
     // ========================================
     TokensService,
@@ -136,6 +142,8 @@ import { JwtAuthGuard, RolesGuard } from './guards'
   ],
 
   exports: [
+    // Exportar helper para otros módulos si lo necesitan
+    JwtTokenHelper,
     // Exportar servicios para otros módulos si lo necesitan
     AuthService,
     TokensService,

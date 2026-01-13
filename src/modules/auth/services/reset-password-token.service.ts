@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common'
-import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
-import type * as ms from 'ms'
 import { TokenStorageService, REDIS_PREFIXES } from '@core/cache'
+import { JwtTokenHelper } from '../helpers'
 
 export interface ResetPasswordPayload {
   sub: string // userId
@@ -13,108 +12,113 @@ export interface ResetPasswordPayload {
 /**
  * Servicio de gestión de tokens de reset password
  *
- * Soporta dos modos (configurable por ENV):
- * 1. Redis (default) - Tokens temporales almacenados en Redis
- * 2. JWT - Tokens stateless firmados (opcional)
+ * Usa un enfoque híbrido (JWT + Redis) que combina lo mejor de ambos mundos:
+ * - JWT: Token stateless que puede ser verificado sin consultar la base de datos
+ * - Redis: Almacenamiento temporal que permite revocar tokens antes de su expiración
+ *
+ * ¿Por qué híbrido?
+ * - Seguridad: Los tokens pueden ser revocados inmediatamente (ej: después de cambiar contraseña)
+ * - Un solo uso: Una vez usado, el token se elimina de Redis y no puede ser reutilizado
+ * - Verificación rápida: JWT contiene toda la información necesaria
+ * - Trazabilidad: Podemos auditar y listar tokens activos en Redis
+ *
+ * Este es el estándar de la industria para procesos sensibles como recuperación de cuenta.
  *
  * Variables de entorno:
- * - RESET_PASSWORD_TOKEN_MODE: 'redis' | 'jwt' | 'both' (default: 'redis')
- * - RESET_PASSWORD_TOKEN_EXPIRES_IN: '15m', '1h', etc. (default: '1h')
- * - RESET_PASSWORD_JWT_SECRET: Secret para firmar JWTs (requerido si mode incluye 'jwt')
- *
- * Casos de uso:
- * - redis: Token temporal en Redis, más seguro (puede ser revocado)
- * - jwt: Token stateless, no requiere Redis pero no puede ser revocado antes de expirar
- * - both: Genera JWT pero valida contra Redis (revocable + stateless)
+ * - RESET_PASSWORD_TOKEN_EXPIRES_IN: Tiempo de expiración (default: '1h')
+ * - RESET_PASSWORD_JWT_SECRET: Secret para firmar JWTs (REQUERIDO)
  */
 @Injectable()
 export class ResetPasswordTokenService {
-  private readonly tokenMode: 'redis' | 'jwt' | 'both'
   private readonly tokenExpiry: string
-  private readonly jwtSecret?: string
+  private readonly jwtSecret: string
 
   constructor(
     private readonly tokenStorage: TokenStorageService,
-    private readonly jwtService: JwtService,
+    private readonly jwtTokenHelper: JwtTokenHelper,
     private readonly configService: ConfigService,
   ) {
-    this.tokenMode = configService.get('RESET_PASSWORD_TOKEN_MODE', 'redis')
-    this.tokenExpiry = configService.get('RESET_PASSWORD_TOKEN_EXPIRES_IN', '1h')
+    this.tokenExpiry = configService.get(
+      'RESET_PASSWORD_TOKEN_EXPIRES_IN',
+      '1h',
+    )
 
-    if (this.tokenMode === 'jwt' || this.tokenMode === 'both') {
-      const secret = configService.get<string>('RESET_PASSWORD_JWT_SECRET')
-      if (!secret) {
-        throw new Error(
-          'RESET_PASSWORD_JWT_SECRET is required when using JWT mode',
-        )
-      }
-      this.jwtSecret = secret
+    const secret = configService.get<string>('RESET_PASSWORD_JWT_SECRET')
+    if (!secret) {
+      throw new Error(
+        'RESET_PASSWORD_JWT_SECRET is required. Please set it in your .env file.',
+      )
     }
+    this.jwtSecret = secret
   }
 
   /**
    * Genera un token de reset password
    *
+   * Flujo:
+   * 1. Genera un tokenId único (UUID)
+   * 2. Almacena el tokenId en Redis con TTL
+   * 3. Genera un JWT firmado que contiene userId y tokenId
+   * 4. Devuelve el JWT al cliente
+   *
+   * El JWT puede ser verificado sin consultar Redis, pero para mayor seguridad
+   * siempre validamos contra Redis para garantizar que no ha sido revocado.
+   *
    * @param userId - ID del usuario
-   * @returns Token generado (UUID o JWT según configuración)
+   * @returns Token JWT firmado
    */
   async generateToken(userId: string): Promise<string> {
+    // Generar tokenId único
     const tokenId = this.tokenStorage.generateTokenId()
 
-    switch (this.tokenMode) {
-      case 'redis':
-        // Solo Redis: devolver UUID, almacenar en Redis
-        await this.storeInRedis(userId, tokenId)
-        return tokenId
+    // Almacenar en Redis con TTL
+    await this.storeInRedis(userId, tokenId)
 
-      case 'jwt':
-        // Solo JWT: devolver token firmado, NO almacenar en Redis
-        return this.generateJWT(userId, tokenId)
-
-      case 'both':
-        // Híbrido: devolver JWT firmado, PERO validar contra Redis
-        await this.storeInRedis(userId, tokenId)
-        return this.generateJWT(userId, tokenId)
-
-      default:
-        throw new Error(`Invalid token mode: ${this.tokenMode}`)
-    }
+    // Generar y devolver JWT
+    return this.generateJWT(userId, tokenId)
   }
 
   /**
    * Valida un token de reset password
    *
-   * @param token - Token a validar (UUID o JWT)
+   * Flujo de validación híbrido:
+   * 1. Verifica la firma del JWT (criptográficamente seguro)
+   * 2. Verifica que el JWT no haya expirado
+   * 3. Extrae el userId y tokenId del JWT
+   * 4. Verifica que el tokenId existe en Redis (no ha sido revocado)
+   * 5. Si todo es válido, devuelve el userId
+   *
+   * Esto garantiza que:
+   * - El token no ha sido adulterado (firma JWT)
+   * - El token no ha expirado (exp del JWT)
+   * - El token no ha sido revocado (existe en Redis)
+   * - El token no ha sido usado (se elimina de Redis después del primer uso)
+   *
+   * @param token - Token JWT a validar
    * @returns userId si el token es válido, null si no
    */
   async validateToken(token: string): Promise<string | null> {
     try {
-      switch (this.tokenMode) {
-        case 'redis':
-          // Solo Redis: buscar token en Redis
-          return await this.validateRedisToken(token)
+      // 1. Verificar JWT (firma y expiración)
+      const payload = this.jwtTokenHelper.verifyToken<ResetPasswordPayload>(
+        token,
+        this.jwtSecret,
+      )
+      if (!payload) return null
 
-        case 'jwt':
-          // Solo JWT: verificar firma y expiración
-          return this.validateJWT(token)
-
-        case 'both':
-          // Híbrido: verificar JWT Y validar contra Redis
-          const userId = this.validateJWT(token)
-          if (!userId) return null
-
-          const payload = this.decodeJWT(token)
-          const existsInRedis = await this.tokenStorage.validateToken(
-            userId,
-            payload.tokenId,
-            REDIS_PREFIXES.RESET_PASSWORD,
-          )
-
-          return existsInRedis ? userId : null
-
-        default:
-          return null
+      // 2. Verificar que es un token de reset password
+      if (!this.jwtTokenHelper.validateTokenType(payload, 'reset-password')) {
+        return null
       }
+
+      // 3. Verificar que el token existe en Redis (no revocado)
+      const existsInRedis = await this.tokenStorage.validateToken(
+        payload.sub,
+        payload.tokenId,
+        REDIS_PREFIXES.RESET_PASSWORD,
+      )
+
+      return existsInRedis ? payload.sub : null
     } catch {
       return null
     }
@@ -123,32 +127,33 @@ export class ResetPasswordTokenService {
   /**
    * Revoca un token de reset password
    *
-   * @param token - Token a revocar
-   * @returns true si se revocó, false si no existe o no es revocable
+   * Extrae el userId y tokenId del JWT y elimina el token de Redis.
+   * Esto hace que el token sea inmediatamente inválido incluso si
+   * el JWT aún no ha expirado.
+   *
+   * Casos de uso:
+   * - Usuario cambia su contraseña exitosamente
+   * - Administrador revoca manualmente el token
+   * - Usuario solicita un nuevo token (revocar el anterior)
+   *
+   * @param token - Token JWT a revocar
+   * @returns true si se revocó exitosamente, false si el token es inválido
    */
   async revokeToken(token: string): Promise<boolean> {
     try {
-      if (this.tokenMode === 'jwt') {
-        // JWT puro no es revocable (stateless)
-        return false
-      }
+      // Extraer userId y tokenId del JWT
+      const payload =
+        this.jwtTokenHelper.decodeToken<ResetPasswordPayload>(token)
+      if (!payload) return false
 
-      if (this.tokenMode === 'both') {
-        // Híbrido: extraer userId y tokenId del JWT
-        const payload = this.decodeJWT(token)
-        await this.tokenStorage.revokeToken(
-          payload.sub,
-          payload.tokenId,
-          REDIS_PREFIXES.RESET_PASSWORD,
-        )
-        return true
-      }
+      // Eliminar token de Redis
+      await this.tokenStorage.revokeToken(
+        payload.sub,
+        payload.tokenId,
+        REDIS_PREFIXES.RESET_PASSWORD,
+      )
 
-      // Redis: el token es el tokenId directamente
-      // Necesitamos buscar por patrón (no tenemos userId aquí)
-      // Opción: almacenar mapping token -> userId
-      // Por ahora, asumimos que se debe llamar con revokeUserTokens(userId)
-      return false
+      return true
     } catch {
       return false
     }
@@ -157,15 +162,15 @@ export class ResetPasswordTokenService {
   /**
    * Revoca todos los tokens de reset password de un usuario
    *
+   * Útil cuando:
+   * - Usuario cambia su email/contraseña
+   * - Administrador invalida todos los tokens de un usuario
+   * - Usuario reporta acceso no autorizado
+   *
    * @param userId - ID del usuario
    * @returns Número de tokens revocados
    */
   async revokeUserTokens(userId: string): Promise<number> {
-    if (this.tokenMode === 'jwt') {
-      // JWT puro no es revocable
-      return 0
-    }
-
     return await this.tokenStorage.revokeAllUserTokens(
       userId,
       REDIS_PREFIXES.RESET_PASSWORD,
@@ -193,7 +198,7 @@ export class ResetPasswordTokenService {
   private async storeInRedis(userId: string, tokenId: string): Promise<void> {
     await this.tokenStorage.storeToken(userId, tokenId, {
       prefix: REDIS_PREFIXES.RESET_PASSWORD,
-      ttlSeconds: this.getExpirySeconds(this.tokenExpiry),
+      ttlSeconds: this.jwtTokenHelper.getExpirySeconds(this.tokenExpiry),
     })
   }
 
@@ -207,24 +212,18 @@ export class ResetPasswordTokenService {
       type: 'reset-password',
     }
 
-    return this.jwtService.sign(payload, {
-      secret: this.jwtSecret,
-      expiresIn: this.tokenExpiry as ms.StringValue,
-    })
-  }
-
-  /**
-   * Valida un token almacenado en Redis
-   */
-  private async validateRedisToken(tokenId: string): Promise<string | null> {
-    // Para validar solo con tokenId, necesitamos buscar por patrón
-    // Esto es costoso, mejor diseño: usar getTokenData que incluye userId
-    // Por ahora, asumimos que se valida con validateTokenWithUserId
-    return null
+    return this.jwtTokenHelper.generateSignedToken(
+      payload,
+      this.jwtSecret,
+      this.tokenExpiry,
+    )
   }
 
   /**
    * Valida un token almacenado en Redis cuando tenemos el userId
+   *
+   * Método auxiliar para casos donde ya tienes el userId y tokenId.
+   * Normalmente se usa validateToken(jwt) que hace la validación completa.
    */
   async validateTokenWithUserId(
     userId: string,
@@ -235,56 +234,5 @@ export class ResetPasswordTokenService {
       tokenId,
       REDIS_PREFIXES.RESET_PASSWORD,
     )
-  }
-
-  /**
-   * Valida un JWT y devuelve el userId
-   */
-  private validateJWT(token: string): string | null {
-    try {
-      const payload = this.jwtService.verify<ResetPasswordPayload>(token, {
-        secret: this.jwtSecret,
-      })
-
-      if (payload.type !== 'reset-password') {
-        return null
-      }
-
-      return payload.sub
-    } catch {
-      return null
-    }
-  }
-
-  /**
-   * Decodifica un JWT sin verificar
-   */
-  private decodeJWT(token: string): ResetPasswordPayload {
-    const decoded = this.jwtService.decode(token)
-    if (!decoded || typeof decoded === 'string') {
-      throw new Error('Invalid token')
-    }
-    return decoded as ResetPasswordPayload
-  }
-
-  /**
-   * Convierte string de expiración a segundos
-   */
-  private getExpirySeconds(expiryString: string): number {
-    const unit = expiryString.slice(-1)
-    const value = parseInt(expiryString.slice(0, -1), 10)
-
-    switch (unit) {
-      case 's':
-        return value
-      case 'm':
-        return value * 60
-      case 'h':
-        return value * 3600
-      case 'd':
-        return value * 86400
-      default:
-        return 3600 // default 1 hora
-    }
   }
 }

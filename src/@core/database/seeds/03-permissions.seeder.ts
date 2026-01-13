@@ -2,10 +2,7 @@ import { DataSource } from 'typeorm'
 import { Seeder } from 'typeorm-extension'
 import { CasbinRule } from '../../../modules/authorization/entities/casbin-rule.entity'
 import { Role } from '../../../modules/users/entities/user.entity'
-import {
-  AppType,
-  PolicyAction,
-} from '../../../modules/authorization/constants'
+import { AppType, PolicyAction } from '../../../modules/authorization/constants'
 
 /**
  * Interfaz para definir un permiso

@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
 import * as crypto from 'crypto'
-import type * as ms from 'ms'
 import { TokenStorageService, REDIS_PREFIXES } from '@core/cache'
+import { JwtTokenHelper } from '../helpers'
 
 export interface TwoFactorPayload {
   sub: string // userId
@@ -12,93 +11,99 @@ export interface TwoFactorPayload {
 }
 
 /**
- * Servicio de gestión de códigos 2FA
+ * Servicio de gestión de códigos 2FA (Two-Factor Authentication)
  *
- * Soporta dos modos (configurable por ENV):
- * 1. Redis (default) - Códigos temporales almacenados en Redis
- * 2. JWT - Códigos firmados como JWT (opcional, menos común para 2FA)
+ * Usa un enfoque híbrido (JWT + Redis) para máxima seguridad:
+ * - JWT: Token stateless que puede ser transmitido al cliente de forma segura
+ * - Redis: Almacenamiento temporal que permite códigos de un solo uso
+ * - Código numérico: Fácil de leer y transcribir por el usuario
+ *
+ * ¿Por qué híbrido para 2FA?
+ * - Un solo uso: El código se elimina de Redis inmediatamente después de ser usado
+ * - No reutilizable: Aunque alguien intercepte el código, solo funciona una vez
+ * - Tiempo limitado: Los códigos expiran en 5 minutos por defecto
+ * - Revocable: Los códigos pueden ser invalidados inmediatamente
+ * - Trazabilidad: Podemos auditar intentos y códigos activos
+ *
+ * Este es el estándar recomendado por OWASP para autenticación de dos factores.
  *
  * Variables de entorno:
- * - TWO_FACTOR_TOKEN_MODE: 'redis' | 'jwt' | 'both' (default: 'redis')
- * - TWO_FACTOR_CODE_LENGTH: Longitud del código (default: 6)
- * - TWO_FACTOR_CODE_EXPIRES_IN: '5m', '10m', etc. (default: '5m')
- * - TWO_FACTOR_JWT_SECRET: Secret para firmar JWTs (requerido si mode incluye 'jwt')
- *
- * Casos de uso:
- * - redis: Código temporal en Redis (recomendado para 2FA)
- * - jwt: Código firmado como JWT (menos común, útil para sistemas distribuidos)
- * - both: Genera JWT pero valida contra Redis
+ * - TWO_FACTOR_CODE_LENGTH: Longitud del código numérico (default: 6)
+ * - TWO_FACTOR_CODE_EXPIRES_IN: Tiempo de expiración (default: '5m')
+ * - TWO_FACTOR_JWT_SECRET: Secret para firmar JWTs (REQUERIDO)
  */
 @Injectable()
 export class TwoFactorTokenService {
-  private readonly tokenMode: 'redis' | 'jwt' | 'both'
   private readonly codeLength: number
   private readonly codeExpiry: string
-  private readonly jwtSecret?: string
+  private readonly jwtSecret: string
 
   constructor(
     private readonly tokenStorage: TokenStorageService,
-    private readonly jwtService: JwtService,
+    private readonly jwtTokenHelper: JwtTokenHelper,
     private readonly configService: ConfigService,
   ) {
-    this.tokenMode = configService.get('TWO_FACTOR_TOKEN_MODE', 'redis')
     this.codeLength = configService.get('TWO_FACTOR_CODE_LENGTH', 6)
     this.codeExpiry = configService.get('TWO_FACTOR_CODE_EXPIRES_IN', '5m')
 
-    if (this.tokenMode === 'jwt' || this.tokenMode === 'both') {
-      const secret = configService.get<string>('TWO_FACTOR_JWT_SECRET')
-      if (!secret) {
-        throw new Error(
-          'TWO_FACTOR_JWT_SECRET is required when using JWT mode',
-        )
-      }
-      this.jwtSecret = secret
+    const secret = configService.get<string>('TWO_FACTOR_JWT_SECRET')
+    if (!secret) {
+      throw new Error(
+        'TWO_FACTOR_JWT_SECRET is required. Please set it in your .env file.',
+      )
     }
+    this.jwtSecret = secret
   }
 
   /**
    * Genera un código 2FA
    *
+   * Flujo:
+   * 1. Genera un código numérico aleatorio (6 dígitos por defecto)
+   * 2. Almacena el código en Redis con TTL corto (5 minutos por defecto)
+   * 3. Genera un JWT firmado que contiene userId y código
+   * 4. Devuelve tanto el código (para mostrar al usuario) como el token JWT
+   *
+   * El código se envía al usuario (email/SMS) y el JWT puede almacenarse
+   * en el cliente para validación posterior.
+   *
    * @param userId - ID del usuario
-   * @returns Código generado y token (pueden ser el mismo o diferentes según modo)
+   * @returns Objeto con code (para enviar al usuario) y token (JWT para validación)
    */
-  async generateCode(
-    userId: string,
-  ): Promise<{ code: string; token: string }> {
+  async generateCode(userId: string): Promise<{ code: string; token: string }> {
+    // Generar código numérico aleatorio
     const code = this.generateNumericCode()
 
-    switch (this.tokenMode) {
-      case 'redis': {
-        // Solo Redis: almacenar código, devolver código
-        await this.storeInRedis(userId, code)
-        return { code, token: code }
-      }
+    // Almacenar código en Redis con TTL
+    await this.storeInRedis(userId, code)
 
-      case 'jwt': {
-        // Solo JWT: generar token firmado
-        const token = this.generateJWT(userId, code)
-        return { code, token }
-      }
+    // Generar JWT que contiene el código
+    const token = this.generateJWT(userId, code)
 
-      case 'both': {
-        // Híbrido: almacenar en Redis, devolver JWT
-        await this.storeInRedis(userId, code)
-        const token = this.generateJWT(userId, code)
-        return { code, token }
-      }
-
-      default:
-        throw new Error(`Invalid token mode: ${this.tokenMode}`)
-    }
+    return { code, token }
   }
 
   /**
    * Valida un código 2FA
    *
+   * Flujo de validación híbrido:
+   * 1. Verifica la firma del JWT (si se proporciona)
+   * 2. Verifica que el JWT no haya expirado
+   * 3. Verifica que el userId y código del JWT coincidan con los parámetros
+   * 4. Verifica que el código existe en Redis (no ha sido revocado)
+   * 5. Si todo es válido, ELIMINA el código de Redis (un solo uso)
+   * 6. Devuelve true solo si todas las validaciones pasan
+   *
+   * Esto garantiza que:
+   * - El código no ha sido adulterado (firma JWT)
+   * - El código no ha expirado (TTL de Redis y exp del JWT)
+   * - El código solo puede usarse una vez (se elimina después del primer uso)
+   * - El código pertenece al usuario correcto (userId en JWT)
+   *
    * @param userId - ID del usuario
-   * @param code - Código a validar
-   * @param token - Token opcional (si se usa JWT)
-   * @returns true si el código es válido
+   * @param code - Código numérico a validar
+   * @param token - Token JWT (opcional, si no se provee solo valida contra Redis)
+   * @returns true si el código es válido y se usó exitosamente
    */
   async validateCode(
     userId: string,
@@ -106,49 +111,45 @@ export class TwoFactorTokenService {
     token?: string,
   ): Promise<boolean> {
     try {
-      switch (this.tokenMode) {
-        case 'redis':
-          // Solo Redis: validar contra Redis
-          return await this.validateRedisCode(userId, code)
-
-        case 'jwt': {
-          // Solo JWT: verificar firma y código
-          if (!token) return false
-          const payload = this.validateJWT(token)
-          return payload?.sub === userId && payload?.code === code
-        }
-
-        case 'both': {
-          // Híbrido: verificar JWT Y validar contra Redis
-          if (!token) return false
-          const payload = this.validateJWT(token)
-          if (!payload || payload.sub !== userId || payload.code !== code) {
-            return false
-          }
-          return await this.validateRedisCode(userId, code)
-        }
-
-        default:
+      // Si se proporciona token JWT, validarlo primero
+      if (token) {
+        const payload = this.jwtTokenHelper.verifyToken<TwoFactorPayload>(
+          token,
+          this.jwtSecret,
+        )
+        if (
+          !payload ||
+          payload.sub !== userId ||
+          payload.code !== code ||
+          !this.jwtTokenHelper.validateTokenType(payload, '2fa')
+        ) {
           return false
+        }
       }
+
+      // Validar contra Redis (esto también elimina el código si es válido)
+      return await this.validateRedisCode(userId, code)
     } catch {
       return false
     }
   }
 
   /**
-   * Revoca un código 2FA (lo elimina de Redis)
+   * Revoca un código 2FA específico
+   *
+   * Elimina el código de Redis, haciendo que cualquier intento posterior
+   * de usar ese código falle, incluso si el JWT aún es válido.
+   *
+   * Casos de uso:
+   * - Usuario solicita un nuevo código (revocar el anterior)
+   * - Detectar intentos sospechosos (revocar por seguridad)
+   * - Usuario completa el login exitosamente (limpiar código usado)
    *
    * @param userId - ID del usuario
-   * @param code - Código a revocar
+   * @param code - Código numérico a revocar
    * @returns true si se revocó exitosamente
    */
   async revokeCode(userId: string, code: string): Promise<boolean> {
-    if (this.tokenMode === 'jwt') {
-      // JWT puro no es revocable
-      return false
-    }
-
     try {
       await this.tokenStorage.revokeToken(
         userId,
@@ -164,14 +165,16 @@ export class TwoFactorTokenService {
   /**
    * Revoca todos los códigos 2FA de un usuario
    *
+   * Útil cuando:
+   * - Usuario cambia su contraseña o email
+   * - Detectar actividad sospechosa en la cuenta
+   * - Usuario reporta acceso no autorizado
+   * - Administrador invalida todos los códigos pendientes
+   *
    * @param userId - ID del usuario
    * @returns Número de códigos revocados
    */
   async revokeAllUserCodes(userId: string): Promise<number> {
-    if (this.tokenMode === 'jwt') {
-      return 0
-    }
-
     return await this.tokenStorage.revokeAllUserTokens(
       userId,
       REDIS_PREFIXES.TWO_FACTOR,
@@ -193,7 +196,7 @@ export class TwoFactorTokenService {
   private async storeInRedis(userId: string, code: string): Promise<void> {
     await this.tokenStorage.storeToken(userId, code, {
       prefix: REDIS_PREFIXES.TWO_FACTOR,
-      ttlSeconds: this.getExpirySeconds(this.codeExpiry),
+      ttlSeconds: this.jwtTokenHelper.getExpirySeconds(this.codeExpiry, 300),
     })
   }
 
@@ -228,50 +231,11 @@ export class TwoFactorTokenService {
       type: '2fa',
     }
 
-    return this.jwtService.sign(payload, {
-      secret: this.jwtSecret,
-      expiresIn: this.codeExpiry as ms.StringValue,
-    })
-  }
-
-  /**
-   * Valida un JWT y devuelve el payload
-   */
-  private validateJWT(token: string): TwoFactorPayload | null {
-    try {
-      const payload = this.jwtService.verify<TwoFactorPayload>(token, {
-        secret: this.jwtSecret,
-      })
-
-      if (payload.type !== '2fa') {
-        return null
-      }
-
-      return payload
-    } catch {
-      return null
-    }
-  }
-
-  /**
-   * Convierte string de expiración a segundos
-   */
-  private getExpirySeconds(expiryString: string): number {
-    const unit = expiryString.slice(-1)
-    const value = parseInt(expiryString.slice(0, -1), 10)
-
-    switch (unit) {
-      case 's':
-        return value
-      case 'm':
-        return value * 60
-      case 'h':
-        return value * 3600
-      case 'd':
-        return value * 86400
-      default:
-        return 300 // default 5 minutos
-    }
+    return this.jwtTokenHelper.generateSignedToken(
+      payload,
+      this.jwtSecret,
+      this.codeExpiry,
+    )
   }
 
   /**

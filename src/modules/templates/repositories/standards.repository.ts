@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, IsNull } from 'typeorm'
 import { BaseRepository } from '@core/repositories'
-import { TransactionService } from '@core/database'
+import { TransactionService, AuditService } from '@core/database'
 import { StandardEntity } from '../entities/standard.entity'
 import type { IStandardsRepository } from './interfaces/standards-repository.interface'
 
@@ -21,8 +21,9 @@ export class StandardsRepository
     @InjectRepository(StandardEntity)
     repository: Repository<StandardEntity>,
     transactionService: TransactionService,
+    auditService: AuditService,
   ) {
-    super(repository, transactionService)
+    super(repository, transactionService, auditService)
   }
 
   /**
@@ -73,9 +74,7 @@ export class StandardsRepository
    * @param templateId - ID del template
    * @returns Lista de standards auditables
    */
-  async findAuditableByTemplate(
-    templateId: string,
-  ): Promise<StandardEntity[]> {
+  async findAuditableByTemplate(templateId: string): Promise<StandardEntity[]> {
     return await this.getRepo().find({
       where: {
         templateId,

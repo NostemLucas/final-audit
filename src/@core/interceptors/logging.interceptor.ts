@@ -9,28 +9,20 @@ import { tap } from 'rxjs/operators'
 import { Request, Response } from 'express'
 import { LoggerService } from '../logger/logger.service'
 
-interface RequestWithUser extends Request {
-  user?: {
-    id: string
-    email: string
-    username?: string
-  }
-}
-
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   constructor(private readonly logger: LoggerService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const ctx = context.switchToHttp()
-    const request = ctx.getRequest<RequestWithUser>()
+    const request = ctx.getRequest<Request>()
     const response = ctx.getResponse<Response>()
     const startTime = Date.now()
 
     // Obtener información del usuario si está autenticado
     const userContext = request.user
       ? {
-          userId: request.user.id,
+          userId: request.user.sub,
           userEmail: request.user.email,
           userName: request.user.username,
         }

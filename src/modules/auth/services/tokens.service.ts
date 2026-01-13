@@ -5,6 +5,7 @@ import type * as ms from 'ms'
 import { TokenStorageService, REDIS_PREFIXES, CACHE_KEYS } from '@core/cache'
 import type { JwtPayload, JwtRefreshPayload } from '../interfaces'
 import type { UserEntity } from '../../users/entities/user.entity'
+import { JwtTokenHelper } from '../helpers'
 
 /**
  * Servicio de gestión de tokens JWT
@@ -17,6 +18,7 @@ import type { UserEntity } from '../../users/entities/user.entity'
  * - Token rotation en refresh
  *
  * Usa TokenStorageService para operaciones de Redis estandarizadas
+ * Usa JwtTokenHelper para operaciones JWT compartidas
  */
 @Injectable()
 export class TokensService {
@@ -28,6 +30,7 @@ export class TokensService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly tokenStorage: TokenStorageService,
+    private readonly jwtTokenHelper: JwtTokenHelper,
   ) {
     this.accessTokenExpiry = configService.get('JWT_EXPIRES_IN', '15m')
     this.refreshTokenExpiry = configService.get('JWT_REFRESH_EXPIRES_IN', '7d')
@@ -69,15 +72,16 @@ export class TokensService {
       tokenId,
     }
 
-    const refreshToken = this.jwtService.sign(refreshPayload, {
-      secret: this.refreshTokenSecret,
-      expiresIn: this.refreshTokenExpiry as ms.StringValue,
-    })
+    const refreshToken = this.jwtTokenHelper.generateSignedToken(
+      refreshPayload,
+      this.refreshTokenSecret,
+      this.refreshTokenExpiry,
+    )
 
     // Almacenar refresh token en Redis con TTL
     await this.tokenStorage.storeToken(user.id, tokenId, {
       prefix: REDIS_PREFIXES.REFRESH_TOKEN,
-      ttlSeconds: this.getExpirySeconds(this.refreshTokenExpiry),
+      ttlSeconds: this.jwtTokenHelper.getExpirySeconds(this.refreshTokenExpiry),
     })
 
     return { accessToken, refreshToken }
@@ -178,36 +182,10 @@ export class TokensService {
    * @returns Payload decodificado
    */
   decodeRefreshToken(token: string): JwtRefreshPayload {
-    const decoded = this.jwtService.decode(token)
-    // decode() puede devolver null, string o object
-    // Asumimos que es un JwtRefreshPayload válido si existe
-    if (!decoded || typeof decoded === 'string') {
+    const decoded = this.jwtTokenHelper.decodeToken<JwtRefreshPayload>(token)
+    if (!decoded) {
       throw new Error('Token inválido')
     }
-    return decoded as JwtRefreshPayload
-  }
-
-  /**
-   * Convierte un string de expiración (ej: "15m", "7d") a segundos
-   *
-   * @param expiryString - String de expiración (15m, 1h, 7d, etc.)
-   * @returns Tiempo en segundos
-   */
-  private getExpirySeconds(expiryString: string): number {
-    const unit = expiryString.slice(-1)
-    const value = parseInt(expiryString.slice(0, -1), 10)
-
-    switch (unit) {
-      case 's':
-        return value
-      case 'm':
-        return value * 60
-      case 'h':
-        return value * 3600
-      case 'd':
-        return value * 86400
-      default:
-        return 900 // default 15 minutos
-    }
+    return decoded
   }
 }

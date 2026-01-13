@@ -9,7 +9,7 @@ import {
 } from 'typeorm'
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 import { IBaseRepository } from './base-repository.interface'
-import { TransactionService } from '@core/database'
+import { TransactionService, AuditService } from '@core/database'
 import {
   PaginationDto,
   PaginatedResponse,
@@ -22,6 +22,7 @@ export abstract class BaseRepository<
   protected constructor(
     protected readonly repository: Repository<T>,
     protected readonly transactionService: TransactionService,
+    protected readonly auditService: AuditService,
   ) {}
 
   /**
@@ -60,11 +61,25 @@ export abstract class BaseRepository<
   // ---------- Métodos de guardado ----------
   async save(data: DeepPartial<T>): Promise<T> {
     const createdEntity = this.create(data)
+
+    // Aplicar auditoría automática (createdBy para nuevas entidades)
+    // Solo aplica si la entidad no tiene ID (es nueva)
+    const isNew = !createdEntity.id
+    this.auditService.applyAudit(createdEntity, isNew)
+
     return await this.getRepo().save(createdEntity)
   }
 
   async saveMany(data: DeepPartial<T>[]): Promise<T[]> {
-    return await this.getRepo().save(data)
+    const entities = this.createMany(data)
+
+    // Aplicar auditoría a cada entidad
+    entities.forEach((entity) => {
+      const isNew = !entity.id
+      this.auditService.applyAudit(entity, isNew)
+    })
+
+    return await this.getRepo().save(entities)
   }
 
   // ---------- Métodos de búsqueda ----------
@@ -147,12 +162,20 @@ export abstract class BaseRepository<
     id: string,
     partialEntity: QueryDeepPartialEntity<T>,
   ): Promise<boolean> {
-    const result = await this.getRepo().update(id, partialEntity)
+    // Aplicar auditoría (updatedBy)
+    const auditData = this.auditService.getUpdateAudit()
+    const dataWithAudit = { ...partialEntity, ...auditData }
+
+    const result = await this.getRepo().update(id, dataWithAudit)
     return (result.affected ?? 0) > 0
   }
 
   async patch(entity: T, partialEntity: DeepPartial<T>): Promise<T> {
     const updatedEntity = this.getRepo().merge(entity, partialEntity)
+
+    // Aplicar auditoría (updatedBy) - no es nueva entidad
+    this.auditService.applyAudit(updatedEntity, false)
+
     return this.getRepo().save(updatedEntity)
   }
 

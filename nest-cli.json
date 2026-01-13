@@ -4,16 +4,15 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
+    "watchAssets": true,
     "assets": [
       {
         "include": "**/*.conf",
-        "outDir": "dist",
-        "watchAssets": true
+        "outDir": "dist"
       },
       {
         "include": "**/*.hbs",
-        "outDir": "dist",
-        "watchAssets": true
+        "outDir": "dist"
       }
     ],
     "plugins": [

@@ -8,14 +8,6 @@ import {
 } from './loggers'
 import { UserContext } from './types'
 
-interface RequestWithUser extends Request {
-  user?: {
-    id: string
-    email: string
-    username?: string
-  }
-}
-
 @Injectable()
 export class LoggerService implements NestLoggerService {
   public readonly http: HttpLogger
@@ -156,17 +148,15 @@ export class LoggerService implements NestLoggerService {
     req: Request,
     userContext?: Partial<UserContext>,
   ): UserContext | undefined {
-    const reqWithUser = req as RequestWithUser
-
     if (userContext && userContext.userId && userContext.userEmail) {
       return this.normalizeUserContext(userContext)
     }
 
-    if (reqWithUser.user) {
+    if (req.user) {
       return {
-        userId: reqWithUser.user.id,
-        userEmail: reqWithUser.user.email,
-        userName: reqWithUser.user.username,
+        userId: req.user.sub,
+        userEmail: req.user.email,
+        userName: req.user.username,
       }
     }
 

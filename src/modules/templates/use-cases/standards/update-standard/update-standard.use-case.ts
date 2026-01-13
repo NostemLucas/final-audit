@@ -39,13 +39,9 @@ export class UpdateStandardUseCase {
    * @throws {BadRequestException} Si intenta establecerse como su propio padre
    */
   @Transactional()
-  async execute(
-    id: string,
-    dto: UpdateStandardDto,
-  ): Promise<StandardEntity> {
+  async execute(id: string, dto: UpdateStandardDto): Promise<StandardEntity> {
     // 1. Buscar el standard con relaciones
-    const standard =
-      await this.standardsRepository.findOneWithRelations(id)
+    const standard = await this.standardsRepository.findOneWithRelations(id)
     if (!standard) {
       throw new StandardNotFoundException(id)
     }
@@ -63,17 +59,13 @@ export class UpdateStandardUseCase {
 
     // 3. Validar que no se establezca a sí mismo como padre
     if (dto.parentId && dto.parentId === id) {
-      throw new BadRequestException(
-        'Un standard no puede ser su propio padre',
-      )
+      throw new BadRequestException('Un standard no puede ser su propio padre')
     }
 
     // 4. Recalcular nivel si cambia el padre
     if (dto.parentId !== undefined && dto.parentId !== standard.parentId) {
       if (dto.parentId) {
-        const newParent = await this.standardsRepository.findById(
-          dto.parentId,
-        )
+        const newParent = await this.standardsRepository.findById(dto.parentId)
         if (!newParent) {
           throw new StandardNotFoundException(dto.parentId)
         }
@@ -87,11 +79,9 @@ export class UpdateStandardUseCase {
     // 5. Actualizar otros campos
     if (dto.code !== undefined) standard.code = dto.code
     if (dto.title !== undefined) standard.title = dto.title
-    if (dto.description !== undefined)
-      standard.description = dto.description
+    if (dto.description !== undefined) standard.description = dto.description
     if (dto.order !== undefined) standard.order = dto.order
-    if (dto.isAuditable !== undefined)
-      standard.isAuditable = dto.isAuditable
+    if (dto.isAuditable !== undefined) standard.isAuditable = dto.isAuditable
     if (dto.isActive !== undefined) standard.isActive = dto.isActive
 
     // 6. Guardar cambios

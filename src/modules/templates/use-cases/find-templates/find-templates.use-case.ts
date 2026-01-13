@@ -20,8 +20,13 @@ export class FindTemplatesUseCase {
    */
   async execute(status?: string): Promise<TemplateEntity[]> {
     // Si se proporciona status, filtrar por él
-    if (status && Object.values(TemplateStatus).includes(status as TemplateStatus)) {
-      return await this.templatesRepository.findByStatus(status as TemplateStatus)
+    if (
+      status &&
+      Object.values(TemplateStatus).includes(status as TemplateStatus)
+    ) {
+      return await this.templatesRepository.findByStatus(
+        status as TemplateStatus,
+      )
     }
 
     // Sin filtro, retornar todos

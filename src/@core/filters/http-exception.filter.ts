@@ -8,14 +8,6 @@ import {
 import { Request, Response } from 'express'
 import { LoggerService } from '../logger/logger.service'
 
-interface RequestWithUser extends Request {
-  user?: {
-    id: string
-    email: string
-    username?: string
-  }
-}
-
 interface ErrorResponse {
   statusCode: number
   timestamp: string
@@ -37,7 +29,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp()
     const response = ctx.getResponse<Response>()
-    const request = ctx.getRequest<RequestWithUser>()
+    const request = ctx.getRequest<Request>()
 
     // Determinar el status code y mensaje
     const { statusCode, message, error, details } =
@@ -46,7 +38,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // Construir contexto de usuario
     const userContext = request.user
       ? {
-          userId: request.user.id,
+          userId: request.user.sub,
           userEmail: request.user.email,
           userName: request.user.username,
         }

@@ -1,6 +1,8 @@
 export * from './database.module'
 export * from './transaction.service'
+export * from './audit.service'
 export * from './transactional.decorator'
 export * from './transaction-discovery.service'
 export { ENTITY_MANAGER_KEY } from './transaction.service'
+export { CURRENT_USER_ID_KEY } from './audit.service'
 export { TRANSACTIONAL_METADATA_KEY } from './transactional.decorator'

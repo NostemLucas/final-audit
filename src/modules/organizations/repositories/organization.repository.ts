@@ -2,7 +2,7 @@ import { BaseRepository } from '@core/repositories'
 import { OrganizationEntity } from '../entities'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { TransactionService } from '@core/database'
+import { TransactionService, AuditService } from '@core/database'
 import { IOrganizationRepository } from './organization-repository.interface'
 import { Injectable } from '@nestjs/common'
 
@@ -15,8 +15,9 @@ export class OrganizationRepository
     @InjectRepository(OrganizationEntity)
     repository: Repository<OrganizationEntity>,
     transactionService: TransactionService,
+    auditService: AuditService,
   ) {
-    super(repository, transactionService)
+    super(repository, transactionService, auditService)
   }
 
   async findByNit(nit: string): Promise<OrganizationEntity | null> {

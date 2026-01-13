@@ -7,8 +7,7 @@ import type { TemplateStatus } from '../../constants/template-status.enum'
  *
  * Define los métodos personalizados para el repositorio de templates
  */
-export interface ITemplatesRepository
-  extends IBaseRepository<TemplateEntity> {
+export interface ITemplatesRepository extends IBaseRepository<TemplateEntity> {
   /**
    * Busca un template por nombre y versión
    */

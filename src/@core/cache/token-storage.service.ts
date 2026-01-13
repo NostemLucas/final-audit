@@ -1,10 +1,11 @@
 import { Injectable, Inject } from '@nestjs/common'
 import Redis from 'ioredis'
 import { v4 as uuidv4 } from 'uuid'
-import { REDIS_CLIENT } from './cache.module'
+import { REDIS_CLIENT } from './cache.tokens'
+import { RedisPrefix } from './cache-keys.constants'
 
 export interface TokenStorageOptions {
-  prefix: string
+  prefix: RedisPrefix
   ttlSeconds?: number
   generateTokenId?: () => string
 }
@@ -101,7 +102,7 @@ export class TokenStorageService {
   async validateToken(
     userId: string,
     tokenId: string,
-    prefix: string,
+    prefix: RedisPrefix,
   ): Promise<boolean> {
     const key = this.buildKey(prefix, userId, tokenId)
     const exists = await this.redis.exists(key)
@@ -119,7 +120,7 @@ export class TokenStorageService {
   async getTokenData(
     userId: string,
     tokenId: string,
-    prefix: string,
+    prefix: RedisPrefix,
   ): Promise<StoredTokenData | null> {
     const key = this.buildKey(prefix, userId, tokenId)
     const data = await this.redis.get(key)
@@ -128,7 +129,27 @@ export class TokenStorageService {
       return null
     }
 
-    return JSON.parse(data)
+    try {
+      // Parseamos el JSON y hacemos type assertion
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const parsed = JSON.parse(data)
+
+      // Validamos que tenga la estructura esperada
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        'tokenId' in parsed &&
+        'userId' in parsed &&
+        'createdAt' in parsed
+      ) {
+        return parsed as StoredTokenData
+      }
+
+      return null
+    } catch {
+      // JSON corrupto en Redis
+      return null
+    }
   }
 
   /**
@@ -141,7 +162,7 @@ export class TokenStorageService {
   async revokeToken(
     userId: string,
     tokenId: string,
-    prefix: string,
+    prefix: RedisPrefix,
   ): Promise<void> {
     const key = this.buildKey(prefix, userId, tokenId)
     await this.redis.del(key)
@@ -154,7 +175,10 @@ export class TokenStorageService {
    * @param prefix - Prefijo de la llave
    * @returns Número de tokens revocados
    */
-  async revokeAllUserTokens(userId: string, prefix: string): Promise<number> {
+  async revokeAllUserTokens(
+    userId: string,
+    prefix: RedisPrefix,
+  ): Promise<number> {
     const pattern = `${prefix}:${userId}:*`
     const keys = await this.redis.keys(pattern)
 
@@ -177,7 +201,7 @@ export class TokenStorageService {
   async refreshTokenTTL(
     userId: string,
     tokenId: string,
-    prefix: string,
+    prefix: RedisPrefix,
     ttlSeconds: number,
   ): Promise<boolean> {
     const key = this.buildKey(prefix, userId, tokenId)
@@ -196,7 +220,7 @@ export class TokenStorageService {
   async getTokenTTL(
     userId: string,
     tokenId: string,
-    prefix: string,
+    prefix: RedisPrefix,
   ): Promise<number> {
     const key = this.buildKey(prefix, userId, tokenId)
     return await this.redis.ttl(key)
@@ -209,7 +233,7 @@ export class TokenStorageService {
    * @param prefix - Prefijo de la llave
    * @returns Lista de IDs de tokens activos
    */
-  async listUserTokens(userId: string, prefix: string): Promise<string[]> {
+  async listUserTokens(userId: string, prefix: RedisPrefix): Promise<string[]> {
     const pattern = `${prefix}:${userId}:*`
     const keys = await this.redis.keys(pattern)
 
@@ -237,7 +261,11 @@ export class TokenStorageService {
    * @param tokenId - ID del token
    * @returns Llave formateada
    */
-  private buildKey(prefix: string, userId: string, tokenId: string): string {
+  private buildKey(
+    prefix: RedisPrefix,
+    userId: string,
+    tokenId: string,
+  ): string {
     return `${prefix}:${userId}:${tokenId}`
   }
 

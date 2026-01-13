@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { BaseRepository } from '@core/repositories'
-import { TransactionService } from '@core/database'
+import { TransactionService, AuditService } from '@core/database'
 import { TemplateEntity } from '../entities/template.entity'
 import { TemplateStatus } from '../constants/template-status.enum'
 import type { ITemplatesRepository } from './interfaces/templates-repository.interface'
@@ -22,8 +22,9 @@ export class TemplatesRepository
     @InjectRepository(TemplateEntity)
     repository: Repository<TemplateEntity>,
     transactionService: TransactionService,
+    auditService: AuditService,
   ) {
-    super(repository, transactionService)
+    super(repository, transactionService, auditService)
   }
 
   /**

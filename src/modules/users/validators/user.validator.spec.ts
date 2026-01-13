@@ -12,6 +12,7 @@ import { USERS_REPOSITORY } from '../tokens'
 import type { IOrganizationRepository } from '../../organizations'
 import { ORGANIZATION_REPOSITORY } from '../../organizations'
 import { createMock } from '@core/testing'
+import { Role } from '../entities'
 
 /**
  * ✅ UNIT TESTS - UserValidator (con PersistenceModule)
@@ -353,7 +354,7 @@ describe('UserValidator', () => {
   describe('should validate unique Roles', () => {
     it('should pass when roles are valid', () => {
       // Arrange
-      const roles = ['ADMIN', 'USER']
+      const roles: Role[] = [Role.ADMIN, Role.AUDITOR]
 
       // Act & Assert
       expect(() => validator.validateRoles(roles)).not.toThrow()

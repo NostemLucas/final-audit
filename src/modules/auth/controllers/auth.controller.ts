@@ -11,7 +11,15 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
 import { AuthService } from '../services'
-import { LoginDto, LoginResponseDto } from '../dtos'
+import {
+  LoginDto,
+  LoginResponseDto,
+  RequestResetPasswordDto,
+  ResetPasswordDto,
+  Generate2FACodeDto,
+  Verify2FACodeDto,
+  Resend2FACodeDto,
+} from '../dtos'
 import { Public, GetUser } from '../decorators'
 import type { JwtPayload } from '../interfaces'
 
@@ -22,6 +30,8 @@ import type { JwtPayload } from '../interfaces'
  * - Login: Autenticación inicial
  * - Refresh: Renovación de tokens con rotation
  * - Logout: Cierre de sesión con revocación de tokens
+ * - Reset Password: Solicitar y resetear contraseña
+ * - 2FA: Generar, verificar y reenviar códigos 2FA
  */
 @ApiTags('Auth')
 @Controller('auth')
@@ -217,5 +227,240 @@ export class AuthController {
 
     const [type, token] = authHeader.split(' ')
     return type === 'Bearer' ? token : undefined
+  }
+
+  // ========================================
+  // Reset Password Endpoints
+  // ========================================
+
+  /**
+   * POST /auth/password/request-reset
+   *
+   * Solicita un reset de contraseña
+   * Genera un token y envía email con link de reset
+   *
+   * @param dto - Email del usuario
+   * @returns Mensaje de confirmación
+   *
+   * @example
+   * ```json
+   * POST /auth/password/request-reset
+   * {
+   *   "email": "usuario@example.com"
+   * }
+   * ```
+   */
+  @Public()
+  @Post('password/request-reset')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Solicitar reset de contraseña' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Email enviado (si el usuario existe)',
+    schema: {
+      properties: {
+        message: {
+          type: 'string',
+          example:
+            'Si el email existe, recibirás un link para resetear tu contraseña',
+        },
+      },
+    },
+  })
+  async requestResetPassword(
+    @Body() dto: RequestResetPasswordDto,
+  ): Promise<{ message: string }> {
+    return await this.authService.requestResetPassword(dto.email)
+  }
+
+  /**
+   * POST /auth/password/reset
+   *
+   * Resetea la contraseña usando el token del email
+   * Revoca el token y cierra todas las sesiones del usuario
+   *
+   * @param dto - Token y nueva contraseña
+   * @returns Mensaje de confirmación
+   *
+   * @example
+   * ```json
+   * POST /auth/password/reset
+   * {
+   *   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+   *   "newPassword": "NewSecurePass123!"
+   * }
+   * ```
+   */
+  @Public()
+  @Post('password/reset')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resetear contraseña con token' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Contraseña actualizada exitosamente',
+    schema: {
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Contraseña actualizada exitosamente',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Token inválido o expirado',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Usuario no encontrado',
+  })
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+  ): Promise<{ message: string }> {
+    return await this.authService.resetPassword(dto.token, dto.newPassword)
+  }
+
+  // ========================================
+  // Two-Factor Authentication (2FA) Endpoints
+  // ========================================
+
+  /**
+   * POST /auth/2fa/generate
+   *
+   * Genera un código 2FA y lo envía por email
+   * Devuelve un token JWT para validación posterior
+   *
+   * @param dto - Email o userId
+   * @returns Token JWT y mensaje de confirmación
+   *
+   * @example
+   * ```json
+   * POST /auth/2fa/generate
+   * {
+   *   "identifier": "usuario@example.com"
+   * }
+   * ```
+   */
+  @Public()
+  @Post('2fa/generate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generar código 2FA' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Código 2FA generado y enviado por email',
+    schema: {
+      properties: {
+        token: {
+          type: 'string',
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        },
+        message: {
+          type: 'string',
+          example: 'Código 2FA enviado al email registrado',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Usuario no encontrado',
+  })
+  async generate2FACode(
+    @Body() dto: Generate2FACodeDto,
+  ): Promise<{ token: string; message: string }> {
+    return await this.authService.generate2FACode(dto.identifier)
+  }
+
+  /**
+   * POST /auth/2fa/verify
+   *
+   * Verifica un código 2FA
+   * El código se elimina de Redis después del primer uso
+   *
+   * @param dto - userId, código y token opcional
+   * @returns Resultado de la validación
+   *
+   * @example
+   * ```json
+   * POST /auth/2fa/verify
+   * {
+   *   "userId": "550e8400-e29b-41d4-a716-446655440000",
+   *   "code": "123456",
+   *   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+   * }
+   * ```
+   */
+  @Public()
+  @Post('2fa/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verificar código 2FA' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Resultado de la verificación',
+    schema: {
+      properties: {
+        valid: {
+          type: 'boolean',
+          example: true,
+        },
+        message: {
+          type: 'string',
+          example: 'Código verificado exitosamente',
+        },
+      },
+    },
+  })
+  async verify2FACode(
+    @Body() dto: Verify2FACodeDto,
+  ): Promise<{ valid: boolean; message: string }> {
+    return await this.authService.verify2FACode(dto.userId, dto.code, dto.token)
+  }
+
+  /**
+   * POST /auth/2fa/resend
+   *
+   * Reenvía un código 2FA
+   * Revoca el código anterior y genera uno nuevo
+   *
+   * @param dto - userId
+   * @returns Nuevo token JWT
+   *
+   * @example
+   * ```json
+   * POST /auth/2fa/resend
+   * {
+   *   "userId": "550e8400-e29b-41d4-a716-446655440000"
+   * }
+   * ```
+   */
+  @Public()
+  @Post('2fa/resend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reenviar código 2FA' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Nuevo código 2FA enviado',
+    schema: {
+      properties: {
+        token: {
+          type: 'string',
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        },
+        message: {
+          type: 'string',
+          example: 'Nuevo código 2FA enviado',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Usuario no encontrado',
+  })
+  async resend2FACode(
+    @Body() dto: Resend2FACodeDto,
+  ): Promise<{ token: string; message: string }> {
+    return await this.authService.resend2FACode(dto.userId)
   }
 }

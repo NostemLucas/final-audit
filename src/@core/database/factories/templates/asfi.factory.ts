@@ -172,8 +172,7 @@ export const ASFITemplate: TemplateDefinition = {
     {
       code: '1.4.1',
       title: 'Políticas de Seguridad',
-      description:
-        'Políticas y procedimientos de seguridad de la información',
+      description: 'Políticas y procedimientos de seguridad de la información',
       order: 1,
       level: 3,
       parentCode: '1.4',
@@ -314,8 +313,7 @@ export const ASFITemplate: TemplateDefinition = {
     {
       code: '2.1.2',
       title: 'Reservas Técnicas',
-      description:
-        'Constitución y gestión de reservas técnicas adecuadas',
+      description: 'Constitución y gestión de reservas técnicas adecuadas',
       order: 2,
       level: 3,
       parentCode: '2.1',

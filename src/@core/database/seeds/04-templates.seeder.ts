@@ -95,8 +95,6 @@ export default class TemplatesSeeder implements Seeder {
       }
     }
 
-    console.log(
-      `      └─ ${templateDef.standards.length} standards creados`,
-    )
+    console.log(`      └─ ${templateDef.standards.length} standards creados`)
   }
 }

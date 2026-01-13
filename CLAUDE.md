@@ -102,13 +102,13 @@ npm run commit             # Commitizen for conventional commits
 
 The `@core` directory contains shared infrastructure modules used across the application. These modules are framework-independent and highly reusable:
 
-- **`database/`** - TypeORM configuration with CLS-based transaction management
+- **`database/`** - TypeORM configuration with CLS-based transaction management and automatic auditing
 - **`logger/`** - Winston-based logging system with specialized loggers (HTTP, Database, Exception, Startup)
 - **`email/`** - Email service with Handlebars templates (welcome, verification, 2FA, password reset)
 - **`files/`** - File upload/management with decorators and validators
-- **`repositories/`** - Generic BaseRepository with CLS integration for transactions
+- **`repositories/`** - Generic BaseRepository with CLS integration for transactions and auditing
 - **`filters/`** - Global exception filters
-- **`interceptors/`** - Request/response interceptors
+- **`interceptors/`** - Request/response interceptors (Logging, Audit)
 - **`entities/`** - Shared base entities
 - **`config/`** - Configuration management
 - **`examples/`** - Example implementations
@@ -177,9 +177,10 @@ All repositories should extend `BaseRepository`:
 export class UserRepository extends BaseRepository<User> {
   constructor(
     @InjectRepository(User) repository: Repository<User>,
-    cls: ClsService, // Required for CLS integration
+    transactionService: TransactionService, // Required for transactions
+    auditService: AuditService, // Required for automatic auditing
   ) {
-    super(repository, cls)
+    super(repository, transactionService, auditService)
   }
 
   // Custom methods
@@ -194,7 +195,90 @@ export class UserRepository extends BaseRepository<User> {
 - Only use `@Transactional()` for operations that modify data, not simple queries
 - The decorator requires `TransactionService` to be injected in the class constructor
 - Nested `@Transactional()` calls reuse the parent transaction
-- Always inject `ClsService` when extending `BaseRepository`
+- Always inject `TransactionService` and `AuditService` when extending `BaseRepository`
+
+## Automatic Auditing with CLS
+
+This project uses **CLS (Continuation Local Storage)** for automatic auditing. The system captures the authenticated user from HTTP requests and automatically applies `createdBy` and `updatedBy` fields without manual intervention.
+
+**See [AUDIT_SYSTEM.md](./docs/AUDIT_SYSTEM.md) for complete documentation.**
+
+### How It Works
+
+1. `JwtAuthGuard` validates the JWT and adds user to `request.user`
+2. `AuditInterceptor` captures `user.sub` (userId) and stores it in CLS
+3. `BaseRepository` reads userId from CLS and applies it automatically in `save()`, `update()`, and `patch()`
+4. All entities inherit `createdBy` and `updatedBy` from `BaseEntity`
+
+### Automatic Usage (No Code Changes Needed)
+
+Auditing happens automatically in all repository operations:
+
+```typescript
+@Injectable()
+export class CreateUserUseCase {
+  constructor(private readonly userRepository: UserRepository) {}
+
+  async execute(dto: CreateUserDto) {
+    // ✅ createdBy is applied automatically from CLS
+    const user = await this.userRepository.save(dto)
+    return user // user.createdBy = current authenticated userId
+  }
+}
+```
+
+### Special Cases
+
+**Seeds and Migrations:**
+```typescript
+// Run as "system" user
+await this.auditService.runAsUser('system', async () => {
+  await this.userRepository.save(defaultUsers)
+  // createdBy = "system"
+})
+
+// Run without user (createdBy = null)
+await this.auditService.runWithoutUser(async () => {
+  await this.migrationRepository.save(data)
+})
+```
+
+**Background Jobs:**
+```typescript
+@Cron('0 0 * * *')
+async dailyJob() {
+  await this.auditService.runAsUser('system:cron', async () => {
+    // All operations have createdBy/updatedBy = "system:cron"
+    await this.generateReports()
+  })
+}
+```
+
+### BaseEntity Fields
+
+All entities automatically have these audit fields:
+
+```typescript
+export abstract class BaseEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+
+  @CreateDateColumn()
+  createdAt: Date
+
+  @UpdateDateColumn()
+  updatedAt: Date
+
+  @Column({ nullable: true })
+  createdBy?: string // ← Automatically filled on creation
+
+  @Column({ nullable: true })
+  updatedBy?: string // ← Automatically filled on updates
+
+  @DeleteDateColumn()
+  deletedAt?: Date
+}
+```
 
 ## Logger System
 
@@ -261,6 +345,114 @@ APP_NAME=Audit Core
 ### Template Structure
 
 Templates are in `src/@core/email/templates/` and use a shared base layout (`layouts/base.hbs`). All templates are responsive and professionally styled.
+
+## Security Tokens System
+
+This project uses a **hybrid approach (JWT + Redis)** for all security-sensitive tokens (password reset, 2FA codes). This is the industry standard for processes that require maximum security.
+
+### Why Hybrid (JWT + Redis)?
+
+The hybrid approach combines the best of both worlds:
+
+**JWT Benefits:**
+- Stateless verification (can validate without database query)
+- Contains all necessary data (userId, tokenId, expiration)
+- Cryptographically signed (tamper-proof)
+- Can be transmitted safely in URLs or headers
+
+**Redis Benefits:**
+- Revocable (can be invalidated immediately)
+- One-time use (deleted after first use)
+- Traceable (can list active tokens for auditing)
+- Time-limited (TTL expires tokens automatically)
+
+### How It Works
+
+**Token Generation:**
+1. Generate unique tokenId (UUID)
+2. Store tokenId in Redis with TTL
+3. Create JWT containing userId + tokenId
+4. Return JWT to client
+
+**Token Validation:**
+1. Verify JWT signature (cryptographic validation)
+2. Check JWT expiration (time validation)
+3. Extract userId and tokenId from JWT
+4. Verify tokenId exists in Redis (not revoked)
+5. Delete from Redis after successful use (one-time use)
+
+**Token Revocation:**
+- Delete tokenId from Redis
+- JWT becomes invalid even if not expired
+- Useful when: password changed, suspicious activity, manual admin action
+
+### Reset Password Tokens
+
+Service: `ResetPasswordTokenService`
+
+Environment variables:
+```bash
+RESET_PASSWORD_TOKEN_EXPIRES_IN=1h  # Token expiration time
+RESET_PASSWORD_JWT_SECRET=your-secret-here  # REQUIRED for signing JWTs
+```
+
+Usage:
+```typescript
+// Generate token
+const token = await this.resetPasswordTokenService.generateToken(userId)
+// Returns JWT that should be sent in email link
+
+// Validate token
+const userId = await this.resetPasswordTokenService.validateToken(token)
+if (userId) {
+  // Token is valid, allow password change
+}
+
+// Revoke token (after successful password change)
+await this.resetPasswordTokenService.revokeToken(token)
+```
+
+### Two-Factor Authentication (2FA) Tokens
+
+Service: `TwoFactorTokenService`
+
+Environment variables:
+```bash
+TWO_FACTOR_CODE_LENGTH=6              # Number of digits in code
+TWO_FACTOR_CODE_EXPIRES_IN=5m         # Code expiration time
+TWO_FACTOR_JWT_SECRET=your-secret-here  # REQUIRED for signing JWTs
+```
+
+Usage:
+```typescript
+// Generate 2FA code
+const { code, token } = await this.twoFactorTokenService.generateCode(userId)
+// `code`: numeric code to send to user (e.g., "123456")
+// `token`: JWT to store in session/client for validation
+
+// Validate code
+const isValid = await this.twoFactorTokenService.validateCode(userId, code, token)
+if (isValid) {
+  // Code is valid and has been consumed (can't be reused)
+}
+
+// Revoke all user codes (security measure)
+await this.twoFactorTokenService.revokeAllUserCodes(userId)
+```
+
+### Security Best Practices
+
+**DO:**
+- Always revoke tokens after successful use
+- Use short TTL for sensitive operations (5m for 2FA, 1h for password reset)
+- Revoke all tokens when user changes password/email
+- Log token generation and validation attempts for auditing
+
+**DON'T:**
+- Never allow token reuse (always delete from Redis after use)
+- Never skip JWT signature verification
+- Never extend token expiration (generate new token instead)
+- Never store sensitive data in JWT payload (only IDs)
 
 ## Testing Guidelines
 

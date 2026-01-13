@@ -3,6 +3,7 @@ import { DiscoveryModule } from '@nestjs/core'
 import { ClsModule } from 'nestjs-cls'
 import { TransactionService } from './transaction.service'
 import { TransactionDiscoveryService } from './transaction-discovery.service'
+import { AuditService } from './audit.service'
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 
@@ -10,6 +11,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
  * Módulo global de database implementa:
  * - CLS (Continuation Local Storage) para request scope
  * - TransactionService para manejar transacciones
+ * - AuditService para auditoría automática (createdBy/updatedBy)
  * - Discovery automático de métodos @Transactional()
  */
 @Global()
@@ -42,9 +44,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
   ],
   providers: [
     TransactionService,
+    AuditService,
     // ✅ TransactionDiscoveryService escanea y envuelve métodos @Transactional()
     TransactionDiscoveryService,
   ],
-  exports: [TransactionService, ClsModule],
+  exports: [TransactionService, AuditService, ClsModule],
 })
 export class DatabaseModule {}

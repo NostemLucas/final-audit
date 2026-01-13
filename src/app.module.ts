@@ -7,7 +7,7 @@ import { DatabaseModule } from '@core/database'
 import { APP_INTERCEPTOR, APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { LoggerModule } from '@core/logger'
 import { HttpExceptionFilter } from '@core/filters'
-import { LoggingInterceptor } from '@core/interceptors'
+import { LoggingInterceptor, AuditInterceptor } from '@core/interceptors'
 import { databaseConfig } from '@core/config'
 import { FilesModule } from '@core/files'
 import { PersistenceModule } from '@core/persistence'
@@ -64,11 +64,17 @@ import { AuthorizationModule, PermissionsGuard } from './modules/authorization'
     },
 
     // ========================================
-    // Global Interceptors
+    // Global Interceptors (orden de ejecución)
     // ========================================
+    // 1. LoggingInterceptor: Logging de requests HTTP
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    // 2. AuditInterceptor: Captura usuario y lo guarda en CLS para auditoría
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
     },
   ],
 })

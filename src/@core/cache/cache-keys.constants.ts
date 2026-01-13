@@ -14,6 +14,8 @@ export const REDIS_PREFIXES = {
   EMAIL_VERIFICATION: 'auth:verify-email',
 } as const
 
+export type RedisPrefix = (typeof REDIS_PREFIXES)[keyof typeof REDIS_PREFIXES]
+
 export const CACHE_KEYS = {
   // Refresh Tokens
   REFRESH_TOKEN: (userId: string, tokenId: string) =>

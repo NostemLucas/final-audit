@@ -1,7 +1,7 @@
 import { Repository, EntityManager, Entity, Column } from 'typeorm'
 import { BaseRepository } from './base.repository'
 import { BaseEntity } from '@core/entities'
-import { TransactionService } from '@core/database'
+import { TransactionService, AuditService } from '@core/database'
 
 /**
  * Tests para BaseRepository - Solo lógica de conmutación de repositorio
@@ -23,8 +23,9 @@ class TestRepository extends BaseRepository<TestEntity> {
   constructor(
     repository: Repository<TestEntity>,
     transactionService: TransactionService,
+    auditService: AuditService,
   ) {
-    super(repository, transactionService)
+    super(repository, transactionService, auditService)
   }
 
   // Exponemos getRepo para probar directamente
@@ -41,22 +42,22 @@ type MockTransactionService = Pick<
 >
 type MockEntityManager = Pick<EntityManager, 'getRepository'>
 
+type MockAuditService = Pick<
+  AuditService,
+  'getCurrentUserId' | 'applyAudit' | 'getUpdateAudit'
+>
+
 describe('BaseRepository - Conmutación de Repositorio con TransactionService', () => {
   let testRepository: TestRepository
   let mockRepository: MockRepository
   let mockTransactionService: jest.Mocked<MockTransactionService>
   let mockEntityManager: jest.Mocked<MockEntityManager>
+  let mockAuditService: jest.Mocked<MockAuditService>
   let mockTransactionRepository: MockRepository
 
   beforeEach(() => {
-    // Mocks con tipado correcto
-    mockRepository = {
-      target: TestEntity,
-    }
-
-    mockTransactionRepository = {
-      target: TestEntity,
-    }
+    mockRepository = { target: TestEntity }
+    mockTransactionRepository = { target: TestEntity }
 
     mockEntityManager = {
       getRepository: jest.fn().mockReturnValue(mockTransactionRepository),
@@ -66,16 +67,23 @@ describe('BaseRepository - Conmutación de Repositorio con TransactionService', 
       getCurrentEntityManager: jest.fn().mockReturnValue(undefined),
     }
 
+    // Inicializamos el mock del AuditService
+    mockAuditService = {
+      getCurrentUserId: jest.fn().mockReturnValue('test-user-id'),
+      applyAudit: jest.fn(),
+      getUpdateAudit: jest.fn().mockReturnValue({ updatedBy: 'test-user-id' }),
+    }
+
     testRepository = new TestRepository(
       mockRepository as Repository<TestEntity>,
       mockTransactionService as unknown as TransactionService,
+      mockAuditService as unknown as AuditService, // Pasamos el mock aquí
     )
   })
 
   afterEach(() => {
     jest.clearAllMocks()
   })
-
   // ============================================
   // ESCENARIO A: Sin transacción (repositorio por defecto)
   // ============================================
@@ -244,6 +252,12 @@ describe('BaseRepository - Conmutación de Repositorio con TransactionService', 
       expect(
         mockTransactionService.getCurrentEntityManager,
       ).toHaveBeenCalledTimes(3)
+    })
+  })
+
+  describe('Integración con AuditService', () => {
+    it('debe estar definido el auditService en el repositorio', () => {
+      expect(testRepository['auditService']).toBeDefined()
     })
   })
 })

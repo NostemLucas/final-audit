@@ -50,8 +50,7 @@ export const ISO27001Template: TemplateDefinition = {
     },
     {
       code: 'A.5.1',
-      title:
-        'Directrices de la dirección para la seguridad de la información',
+      title: 'Directrices de la dirección para la seguridad de la información',
       description: null,
       order: 1,
       level: 2,

@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
+import { Request } from 'express'
 import { PATH_METADATA } from '@nestjs/common/constants'
 import { AuthorizationService } from '../services/authorization.service'
 import {
@@ -82,12 +83,8 @@ export class PermissionsGuard implements CanActivate {
     }
 
     // 4. Obtener usuario autenticado del request
-    const request = context.switchToHttp().getRequest<{
-      user: JwtPayload
-      params: Record<string, string>
-      method: string
-    }>()
-    const user: JwtPayload = request.user
+    const request = context.switchToHttp().getRequest<Request>()
+    const user = request.user
 
     if (!user || !user.roles) {
       throw new ForbiddenException('Usuario no autenticado o sin roles')
@@ -142,7 +139,7 @@ export class PermissionsGuard implements CanActivate {
     path: string
     method: string
   } {
-    const request = context.switchToHttp().getRequest<{ method: string }>()
+    const request = context.switchToHttp().getRequest<Request>()
 
     // Obtener método HTTP (GET, POST, PATCH, DELETE)
     const method: string = request.method

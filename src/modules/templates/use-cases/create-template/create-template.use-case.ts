@@ -29,10 +29,8 @@ export class CreateTemplateUseCase {
   @Transactional()
   async execute(dto: CreateTemplateDto): Promise<TemplateEntity> {
     // 1. Verificar que no exista un template con ese nombre y versión
-    const existingTemplate = await this.templatesRepository.findByNameAndVersion(
-      dto.name,
-      dto.version,
-    )
+    const existingTemplate =
+      await this.templatesRepository.findByNameAndVersion(dto.name, dto.version)
 
     if (existingTemplate) {
       throw new TemplateAlreadyExistsException(dto.name, dto.version)

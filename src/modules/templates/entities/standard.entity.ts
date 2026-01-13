@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm'
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm'
 import { BaseEntity } from '@core/entities/base.entity'
 import { TemplateEntity } from './template.entity'
 

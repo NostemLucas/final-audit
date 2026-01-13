@@ -6,8 +6,7 @@ import type { StandardEntity } from '../../entities/standard.entity'
  *
  * Define los métodos personalizados para el repositorio de standards
  */
-export interface IStandardsRepository
-  extends IBaseRepository<StandardEntity> {
+export interface IStandardsRepository extends IBaseRepository<StandardEntity> {
   /**
    * Obtiene todos los standards de un template
    */
@@ -32,10 +31,7 @@ export interface IStandardsRepository
   /**
    * Busca un standard por código dentro de un template
    */
-  findByCode(
-    templateId: string,
-    code: string,
-  ): Promise<StandardEntity | null>
+  findByCode(templateId: string, code: string): Promise<StandardEntity | null>
 
   /**
    * Obtiene un standard con sus relaciones completas (template, parent, children)
