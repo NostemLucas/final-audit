@@ -11,8 +11,8 @@ import { Transform } from 'class-transformer'
  * Transforma una fecha a UTC
  */
 export function ToUtcDate(): PropertyDecorator {
-  return Transform(({ value }) => {
-    if (!value) return value
+  return Transform(({ value }: { value: unknown }) => {
+    if (!value) return value as Date | null | undefined
 
     try {
       let date: Date
@@ -22,11 +22,11 @@ export function ToUtcDate(): PropertyDecorator {
       } else if (typeof value === 'string' || typeof value === 'number') {
         date = new Date(value)
       } else {
-        return value
+        return value as Date
       }
 
       if (isNaN(date.getTime())) {
-        return value
+        return value as Date
       }
 
       return new Date(
@@ -41,7 +41,7 @@ export function ToUtcDate(): PropertyDecorator {
         ),
       )
     } catch {
-      return value
+      return value as Date
     }
   })
 }
@@ -50,8 +50,8 @@ export function ToUtcDate(): PropertyDecorator {
  * Transforma una fecha a string ISO UTC
  */
 export function ToUtcDateString(): PropertyDecorator {
-  return Transform(({ value }) => {
-    if (!value) return value
+  return Transform(({ value }: { value: unknown }) => {
+    if (!value) return value as string | null | undefined
 
     try {
       let date: Date
@@ -61,16 +61,16 @@ export function ToUtcDateString(): PropertyDecorator {
       } else if (typeof value === 'string' || typeof value === 'number') {
         date = new Date(value)
       } else {
-        return value
+        return value as string
       }
 
       if (isNaN(date.getTime())) {
-        return value
+        return value as string
       }
 
       return date.toISOString()
     } catch {
-      return value
+      return value as string
     }
   })
 }
@@ -79,11 +79,11 @@ export function ToUtcDateString(): PropertyDecorator {
  * Transforma strings a minúsculas
  */
 export function ToLowerCase(): PropertyDecorator {
-  return Transform(({ value }) => {
+  return Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return value.toLowerCase()
     }
-    return value
+    return value as string
   })
 }
 
@@ -91,11 +91,11 @@ export function ToLowerCase(): PropertyDecorator {
  * Transforma strings a mayúsculas
  */
 export function ToUpperCase(): PropertyDecorator {
-  return Transform(({ value }) => {
+  return Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return value.toUpperCase()
     }
-    return value
+    return value as string
   })
 }
 
@@ -103,11 +103,11 @@ export function ToUpperCase(): PropertyDecorator {
  * Elimina espacios en blanco al inicio y final
  */
 export function Trim(): PropertyDecorator {
-  return Transform(({ value }) => {
+  return Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return value.trim()
     }
-    return value
+    return value as string
   })
 }
 
@@ -115,9 +115,9 @@ export function Trim(): PropertyDecorator {
  * Convierte a número si es posible
  */
 export function ToNumber(): PropertyDecorator {
-  return Transform(({ value }) => {
+  return Transform(({ value }: { value: unknown }) => {
     if (value === null || value === undefined || value === '') {
-      return value
+      return value as number | null | undefined | string
     }
 
     if (typeof value === 'number') {
@@ -126,14 +126,14 @@ export function ToNumber(): PropertyDecorator {
 
     if (typeof value === 'string') {
       const trimmed = value.trim()
-      if (trimmed === '') return value
+      if (trimmed === '') return value as unknown as number
 
       const num = Number(trimmed)
-      return isNaN(num) ? value : num
+      return isNaN(num) ? (value as unknown as number) : num
     }
 
     const num = Number(value)
-    return isNaN(num) ? value : num
+    return isNaN(num) ? (value as unknown as number) : num
   })
 }
 
@@ -141,7 +141,7 @@ export function ToNumber(): PropertyDecorator {
  * Convierte a boolean de manera inteligente
  */
 export function ToBoolean(): PropertyDecorator {
-  return Transform(({ value }) => {
+  return Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'boolean') return value
 
     if (typeof value === 'string') {
@@ -164,8 +164,8 @@ export function ToBoolean(): PropertyDecorator {
  * Convierte a array
  */
 export function ToArray(): PropertyDecorator {
-  return Transform(({ value }) => {
-    if (Array.isArray(value)) return value
+  return Transform(({ value }: { value: unknown }) => {
+    if (Array.isArray(value)) return value as unknown[]
 
     if (typeof value === 'string') {
       const trimmed = value.trim()
@@ -173,8 +173,8 @@ export function ToArray(): PropertyDecorator {
 
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         try {
-          const parsed = JSON.parse(trimmed)
-          return Array.isArray(parsed) ? parsed : [value]
+          const parsed: unknown = JSON.parse(trimmed)
+          return Array.isArray(parsed) ? (parsed as unknown[]) : [value]
         } catch {
           return [value]
         }
@@ -188,7 +188,7 @@ export function ToArray(): PropertyDecorator {
 
     if (value === null || value === undefined) return []
 
-    return [value]
+    return [value] as unknown[]
   })
 }
 
@@ -196,7 +196,7 @@ export function ToArray(): PropertyDecorator {
  * Convierte a array de strings
  */
 export function ToStringArray(): PropertyDecorator {
-  return Transform(({ value }) => {
+  return Transform(({ value }: { value: unknown }) => {
     if (
       Array.isArray(value) &&
       value.every((item) => typeof item === 'string')
@@ -206,9 +206,16 @@ export function ToStringArray(): PropertyDecorator {
 
     if (Array.isArray(value)) {
       return value
-        .map((item) => {
+        .map((item: unknown) => {
           if (item === null || item === undefined) return ''
-          return String(item).trim()
+          if (
+            typeof item === 'string' ||
+            typeof item === 'number' ||
+            typeof item === 'boolean'
+          ) {
+            return String(item).trim()
+          }
+          return JSON.stringify(item)
         })
         .filter((str) => str.length > 0)
     }
@@ -231,7 +238,18 @@ export function ToStringArray(): PropertyDecorator {
       return []
     }
 
-    const str = String(value).trim()
+    // Handle other types (numbers, booleans, objects)
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      const str = String(value).trim()
+      return str.length > 0 ? [str] : []
+    }
+
+    // For objects, use JSON.stringify
+    const str = JSON.stringify(value)
     return str.length > 0 ? [str] : []
   })
 }
@@ -240,17 +258,17 @@ export function ToStringArray(): PropertyDecorator {
  * Convierte a array de números
  */
 export function ToNumberArray(): PropertyDecorator {
-  return Transform(({ value }) => {
+  return Transform(({ value }: { value: unknown }) => {
     if (
       Array.isArray(value) &&
       value.every((item) => typeof item === 'number' && !isNaN(item))
     ) {
-      return value
+      return value as number[]
     }
 
     if (Array.isArray(value)) {
       return value
-        .map((item) => {
+        .map((item: unknown) => {
           if (item === null || item === undefined || item === '') return NaN
           return Number(item)
         })

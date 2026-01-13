@@ -11,6 +11,43 @@ Sistema simplificado de internacionalización para class-validator con mensajes 
 ✅ **Type-safe**: TypeScript completo
 ✅ **Single Source of Truth**: Diccionario centralizado de traducciones
 
+## 🧪 Testing Interactivo
+
+Prueba el sistema i18n con la herramienta de testing interactiva:
+
+```bash
+# Probar todos los escenarios
+npm run i18n:test
+
+# Ver ayuda
+npm run i18n:test help
+
+# Probar escenarios específicos
+npm run i18n:test translation      # Traducción automática
+npm run i18n:test transformers     # Transformers de datos
+npm run i18n:test enums            # Validación de enums/UUIDs
+npm run i18n:test custom-field     # Nombres personalizados
+npm run i18n:test numbers          # Validaciones numéricas
+npm run i18n:test patterns         # Validación con regex
+```
+
+**Ejemplo de salida:**
+
+```
+══════════════════════════════════════════════════════════════════════
+  🌐 Traducción Automática de Campos
+  Demuestra cómo los nombres de campos se traducen automáticamente
+══════════════════════════════════════════════════════════════════════
+
+  📝 Escenario: Datos inválidos
+
+  ⚠ Errores encontrados: 4
+    ✖ El campo nombres debe tener al menos 2 caracteres
+    ✖ El campo apellidos debe tener al menos 2 caracteres
+    ✖ El campo correo electrónico debe ser una dirección de correo electrónico válida
+    ✖ El campo nombre de usuario debe tener al menos 3 caracteres
+```
+
 ## Estructura
 
 ```

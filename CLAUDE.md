@@ -91,6 +91,18 @@ npm run files:test url test-uploads/file.jpg       # Get file URL
 npm run files:test replace                   # Test file replacement
 ```
 
+### i18n Testing
+```bash
+npm run i18n:test                  # Test all validation scenarios
+npm run i18n:test help             # Show available scenarios
+npm run i18n:test translation      # Test automatic field translation
+npm run i18n:test transformers     # Test data transformers
+npm run i18n:test enums            # Test enum/UUID validation
+npm run i18n:test custom-field     # Test custom field names
+npm run i18n:test numbers          # Test numeric validations
+npm run i18n:test patterns         # Test regex patterns
+```
+
 ### Git
 ```bash
 npm run commit             # Commitizen for conventional commits

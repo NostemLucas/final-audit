@@ -5,8 +5,7 @@ import { getFieldName } from '../constants/field-names.constants'
 /**
  * Extended validation options with optional field name override
  */
-export interface ExtendedValidationOptions
-  extends validator.ValidationOptions {
+export interface ExtendedValidationOptions extends validator.ValidationOptions {
   fieldName?: string
 }
 
@@ -28,7 +27,7 @@ export const createMessage = (
 
     // Replace value
     if (message.includes('{{value}}')) {
-      let valueStr = args.value
+      let valueStr: string
       if (typeof args.value === 'object' && args.value !== null) {
         valueStr = JSON.stringify(args.value)
       } else if (args.value === null) {
@@ -43,7 +42,7 @@ export const createMessage = (
 
     // Replace constraints
     if (args.constraints) {
-      args.constraints.forEach((constraint, index) => {
+      args.constraints.forEach((constraint: unknown, index: number) => {
         const placeholder = `{{constraint${index + 1}}}`
         if (message.includes(placeholder)) {
           let constraintStr: string
@@ -66,12 +65,32 @@ export const createMessage = (
       })
 
       // Special placeholders for min/max
-      const [constraint1, constraint2] = args.constraints
-      message = message.replace(/\{\{min\}\}/g, String(constraint1 || ''))
-      message = message.replace(
-        /\{\{max\}\}/g,
-        String(constraint2 || constraint1 || ''),
-      )
+      const constraint1 = args.constraints[0] as unknown
+      const constraint2 = args.constraints[1] as unknown
+
+      const getConstraintString = (constraint: unknown): string => {
+        if (constraint === null || constraint === undefined) return ''
+        if (
+          typeof constraint === 'string' ||
+          typeof constraint === 'number' ||
+          typeof constraint === 'boolean'
+        ) {
+          return String(constraint)
+        }
+        if (constraint instanceof Date) {
+          return constraint.toLocaleDateString()
+        }
+        return JSON.stringify(constraint)
+      }
+
+      const constraint1Str = getConstraintString(constraint1)
+      const constraint2Str =
+        constraint2 !== null && constraint2 !== undefined
+          ? getConstraintString(constraint2)
+          : constraint1Str
+
+      message = message.replace(/\{\{min\}\}/g, constraint1Str)
+      message = message.replace(/\{\{max\}\}/g, constraint2Str)
     }
 
     return message
@@ -88,14 +107,14 @@ export const createMessage = (
  * @param messageKey - The Spanish message template
  * @returns A wrapper function that applies Spanish messages
  */
-export const createValidator = <TArgs extends any[]>(
-  validatorFn: (...args: any[]) => PropertyDecorator,
+export const createValidator = <TArgs extends unknown[]>(
+  validatorFn: (...args: unknown[]) => PropertyDecorator,
   messageKey: ValidationMessageEnum,
 ) => {
   return (...args: TArgs): PropertyDecorator => {
     // Find validation options (always last argument or undefined)
     let validationOptions: ExtendedValidationOptions | undefined
-    let otherArgs: any[] = []
+    let otherArgs: unknown[] = []
 
     // Check if last argument is validation options
     const lastArg = args[args.length - 1]
@@ -103,18 +122,18 @@ export const createValidator = <TArgs extends any[]>(
       lastArg &&
       typeof lastArg === 'object' &&
       !Array.isArray(lastArg) &&
-      (lastArg.message !== undefined ||
-        lastArg.groups !== undefined ||
-        lastArg.always !== undefined ||
-        lastArg.each !== undefined ||
-        lastArg.context !== undefined ||
-        (lastArg as ExtendedValidationOptions).fieldName !== undefined)
+      ('message' in lastArg ||
+        'groups' in lastArg ||
+        'always' in lastArg ||
+        'each' in lastArg ||
+        'context' in lastArg ||
+        'fieldName' in lastArg)
     ) {
-      validationOptions = lastArg
+      validationOptions = lastArg as ExtendedValidationOptions
       otherArgs = args.slice(0, -1)
     } else {
       validationOptions = undefined
-      otherArgs = args as any[]
+      otherArgs = args as unknown[]
     }
 
     // Extract fieldName and create final options
