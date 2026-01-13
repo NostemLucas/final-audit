@@ -1,10 +1,8 @@
-import { Injectable, Inject } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
-import Redis from 'ioredis'
-import { v4 as uuidv4 } from 'uuid'
 import type * as ms from 'ms'
-import { REDIS_CLIENT } from '@core/cache'
+import { TokenStorageService, REDIS_PREFIXES, CACHE_KEYS } from '@core/cache'
 import type { JwtPayload, JwtRefreshPayload } from '../interfaces'
 import type { UserEntity } from '../../users/entities/user.entity'
 
@@ -17,6 +15,8 @@ import type { UserEntity } from '../../users/entities/user.entity'
  * - Validar tokens contra Redis
  * - Revocar tokens (blacklist)
  * - Token rotation en refresh
+ *
+ * Usa TokenStorageService para operaciones de Redis estandarizadas
  */
 @Injectable()
 export class TokensService {
@@ -27,7 +27,7 @@ export class TokensService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly tokenStorage: TokenStorageService,
   ) {
     this.accessTokenExpiry = configService.get('JWT_EXPIRES_IN', '15m')
     this.refreshTokenExpiry = configService.get('JWT_REFRESH_EXPIRES_IN', '7d')
@@ -48,7 +48,7 @@ export class TokensService {
   async generateTokenPair(
     user: UserEntity,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const tokenId = uuidv4() // ID único para tracking de rotation
+    const tokenId = this.tokenStorage.generateTokenId()
 
     // Access Token (corta duración, en Authorization header)
     const accessPayload: JwtPayload = {
@@ -75,30 +75,12 @@ export class TokensService {
     })
 
     // Almacenar refresh token en Redis con TTL
-    await this.storeRefreshToken(
-      user.id,
-      tokenId,
-      this.getExpirySeconds(this.refreshTokenExpiry),
-    )
+    await this.tokenStorage.storeToken(user.id, tokenId, {
+      prefix: REDIS_PREFIXES.REFRESH_TOKEN,
+      ttlSeconds: this.getExpirySeconds(this.refreshTokenExpiry),
+    })
 
     return { accessToken, refreshToken }
-  }
-
-  /**
-   * Almacena un refresh token en Redis
-   *
-   * @param userId - ID del usuario
-   * @param tokenId - ID único del token
-   * @param ttlSeconds - Tiempo de vida en segundos
-   */
-  private async storeRefreshToken(
-    userId: string,
-    tokenId: string,
-    ttlSeconds: number,
-  ): Promise<void> {
-    const key = `refresh_token:${userId}:${tokenId}`
-    // Guardamos timestamp de creación como valor
-    await this.redis.setex(key, ttlSeconds, Date.now().toString())
   }
 
   /**
@@ -112,9 +94,11 @@ export class TokensService {
     userId: string,
     tokenId: string,
   ): Promise<boolean> {
-    const key = `refresh_token:${userId}:${tokenId}`
-    const exists = await this.redis.exists(key)
-    return exists === 1
+    return await this.tokenStorage.validateToken(
+      userId,
+      tokenId,
+      REDIS_PREFIXES.REFRESH_TOKEN,
+    )
   }
 
   /**
@@ -125,8 +109,11 @@ export class TokensService {
    * @param tokenId - ID del token
    */
   async revokeRefreshToken(userId: string, tokenId: string): Promise<void> {
-    const key = `refresh_token:${userId}:${tokenId}`
-    await this.redis.del(key)
+    await this.tokenStorage.revokeToken(
+      userId,
+      tokenId,
+      REDIS_PREFIXES.REFRESH_TOKEN,
+    )
   }
 
   /**
@@ -151,8 +138,8 @@ export class TokensService {
 
       // Solo blacklistear si aún no ha expirado
       if (ttlSeconds > 0) {
-        const key = `blacklist:${token}`
-        await this.redis.setex(key, ttlSeconds, userId)
+        const key = CACHE_KEYS.BLACKLIST(token)
+        await this.tokenStorage.storeSimple(key, userId, ttlSeconds)
       }
     } catch {
       // Token ya expirado o inválido, no es necesario blacklistear
@@ -166,9 +153,8 @@ export class TokensService {
    * @returns true si el token está revocado
    */
   async isTokenBlacklisted(token: string): Promise<boolean> {
-    const key = `blacklist:${token}`
-    const exists = await this.redis.exists(key)
-    return exists === 1
+    const key = CACHE_KEYS.BLACKLIST(token)
+    return await this.tokenStorage.exists(key)
   }
 
   /**
@@ -178,11 +164,10 @@ export class TokensService {
    * @param userId - ID del usuario
    */
   async revokeAllUserTokens(userId: string): Promise<void> {
-    const pattern = `refresh_token:${userId}:*`
-    const keys = await this.redis.keys(pattern)
-    if (keys.length > 0) {
-      await this.redis.del(...keys)
-    }
+    await this.tokenStorage.revokeAllUserTokens(
+      userId,
+      REDIS_PREFIXES.REFRESH_TOKEN,
+    )
   }
 
   /**

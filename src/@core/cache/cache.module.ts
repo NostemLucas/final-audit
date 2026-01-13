@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
+import { TokenStorageService } from './token-storage.service'
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT')
 
@@ -10,6 +11,8 @@ export const REDIS_CLIENT = Symbol('REDIS_CLIENT')
  * Provee un cliente Redis global para:
  * - Almacenar refresh tokens
  * - Blacklist de access tokens
+ * - Reset password tokens
+ * - 2FA codes
  * - Caché general de la aplicación
  *
  * @Global - Disponible en toda la aplicación sin necesidad de importar
@@ -48,7 +51,8 @@ export const REDIS_CLIENT = Symbol('REDIS_CLIENT')
       },
       inject: [ConfigService],
     },
+    TokenStorageService,
   ],
-  exports: [REDIS_CLIENT],
+  exports: [REDIS_CLIENT, TokenStorageService],
 })
 export class CacheModule {}

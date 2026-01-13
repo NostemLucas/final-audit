@@ -1,5 +1,6 @@
 import type { IBaseRepository } from '@core/repositories'
 import type { TemplateEntity } from '../../entities/template.entity'
+import type { TemplateStatus } from '../../constants/template-status.enum'
 
 /**
  * Templates Repository Interface
@@ -9,38 +10,43 @@ import type { TemplateEntity } from '../../entities/template.entity'
 export interface ITemplatesRepository
   extends IBaseRepository<TemplateEntity> {
   /**
-   * Busca un template por nombre dentro de una organización
+   * Busca un template por nombre y versión
    */
-  findByName(
-    organizationId: string,
+  findByNameAndVersion(
     name: string,
+    version: string,
   ): Promise<TemplateEntity | null>
 
   /**
-   * Obtiene todos los templates de una organización
+   * Obtiene todos los templates con un status específico
    */
-  findByOrganization(organizationId: string): Promise<TemplateEntity[]>
+  findByStatus(status: TemplateStatus): Promise<TemplateEntity[]>
 
   /**
-   * Obtiene todos los templates activos de una organización
+   * Obtiene todos los templates publicados (usables)
    */
-  findActiveByOrganization(organizationId: string): Promise<TemplateEntity[]>
+  findPublished(): Promise<TemplateEntity[]>
 
   /**
    * Obtiene un template con sus standards
    */
-  findOneWithStandards(
-    organizationId: string,
+  findOneWithStandards(id: string): Promise<TemplateEntity | null>
+
+  /**
+   * Cambia el status de un template
+   */
+  updateStatus(
     id: string,
+    status: TemplateStatus,
   ): Promise<TemplateEntity | null>
 
   /**
-   * Desactiva un template
+   * Obtiene todas las versiones de un template
    */
-  deactivate(id: string): Promise<TemplateEntity>
+  findVersionsByName(name: string): Promise<TemplateEntity[]>
 
   /**
-   * Activa un template
+   * Obtiene la última versión de un template
    */
-  activate(id: string): Promise<TemplateEntity>
+  findLatestVersion(name: string): Promise<TemplateEntity | null>
 }

@@ -6,7 +6,12 @@ import { APP_GUARD } from '@nestjs/core'
 import type * as ms from 'ms'
 import { UsersModule } from '../users/users.module'
 import { AuthController } from './controllers'
-import { TokensService, AuthService } from './services'
+import {
+  TokensService,
+  AuthService,
+  ResetPasswordTokenService,
+  TwoFactorTokenService,
+} from './services'
 import {
   ValidateUserUseCase,
   LoginUseCase,
@@ -24,6 +29,8 @@ import { JwtAuthGuard, RolesGuard } from './guards'
  * - HTTP-only cookies para refresh tokens
  * - Token rotation en cada refresh
  * - Blacklist con Redis para logout
+ * - Reset password tokens (Redis/JWT/Both)
+ * - 2FA codes (Redis/JWT/Both)
  * - Guards globales para protección de rutas
  * - Decorators para rutas públicas y control de roles
  *
@@ -90,6 +97,8 @@ import { JwtAuthGuard, RolesGuard } from './guards'
     // Services
     // ========================================
     TokensService,
+    ResetPasswordTokenService,
+    TwoFactorTokenService,
     AuthService,
     ConfigService,
     // ========================================
@@ -127,9 +136,12 @@ import { JwtAuthGuard, RolesGuard } from './guards'
   ],
 
   exports: [
-    // Exportar AuthService para otros módulos si lo necesitan
+    // Exportar servicios para otros módulos si lo necesitan
     AuthService,
-    // Exportar guards para uso manual si es necesario (ahora sí están en providers)
+    TokensService,
+    ResetPasswordTokenService,
+    TwoFactorTokenService,
+    // Exportar guards para uso manual si es necesario
     JwtAuthGuard,
     RolesGuard,
   ],
