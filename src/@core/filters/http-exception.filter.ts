@@ -107,13 +107,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // Si la respuesta es un objeto con mensaje
       if (typeof response === 'object' && response !== null) {
         const responseObj = response as Record<string, unknown>
+
+        // Extraer solo información adicional para details (no duplicar)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { message, error, statusCode: _, ...additionalInfo } = responseObj
+        const hasAdditionalInfo = Object.keys(additionalInfo).length > 0
+
         return {
           statusCode: status,
           message:
             (responseObj.message as string | string[]) || exception.message,
           error: (responseObj.error as string) || exception.name,
           details:
-            process.env.NODE_ENV !== 'production' ? responseObj : undefined,
+            process.env.NODE_ENV !== 'production' && hasAdditionalInfo
+              ? additionalInfo
+              : undefined,
         }
       }
 

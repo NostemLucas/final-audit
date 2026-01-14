@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { LoggerService } from '@core/logger'
 import cookieParser from 'cookie-parser'
 import { join } from 'path'
+import { ValidationPipe } from '@nestjs/common'
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule)
@@ -28,6 +29,14 @@ async function bootstrap() {
     credentials: true,
   })
   logger.log(`🔓 CORS habilitado para: ${corsOrigin}`)
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
 
   // Middleware para parsear cookies (requerido para refresh tokens)
   app.use(cookieParser())

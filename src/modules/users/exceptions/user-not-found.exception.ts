@@ -9,6 +9,6 @@ export class UserNotFoundException extends NotFoundException {
     identifier: string,
     field: 'ID' | 'Email' | 'Username' | 'CI' = 'ID',
   ) {
-    super(`Usuario no encontrado con ${field}: "${identifier}"`)
+    super(`Usuario no encontrado con ${field}: '${identifier}'`)
   }
 }

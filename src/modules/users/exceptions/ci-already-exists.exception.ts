@@ -5,6 +5,6 @@ import { ConflictException } from '@nestjs/common'
  */
 export class CiAlreadyExistsException extends ConflictException {
   constructor(ci: string) {
-    super(`El CI "${ci}" ya está registrado`)
+    super(`El CI '${ci}' ya está registrado`)
   }
 }

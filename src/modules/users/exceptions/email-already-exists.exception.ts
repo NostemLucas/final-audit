@@ -5,6 +5,6 @@ import { ConflictException } from '@nestjs/common'
  */
 export class EmailAlreadyExistsException extends ConflictException {
   constructor(email: string) {
-    super(`El email "${email}" ya está registrado`)
+    super(`El email '${email}' ya está registrado`)
   }
 }

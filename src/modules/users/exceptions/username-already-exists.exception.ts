@@ -5,6 +5,6 @@ import { ConflictException } from '@nestjs/common'
  */
 export class UsernameAlreadyExistsException extends ConflictException {
   constructor(username: string) {
-    super(`El username "${username}" ya está en uso`)
+    super(`El username '${username}' ya está en uso`)
   }
 }
