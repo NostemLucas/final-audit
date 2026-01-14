@@ -14,17 +14,37 @@ import {
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger'
 import { UploadLogo } from '@core/files'
-import { OrganizationsService } from '../services/organizations.service'
 import {
   CreateOrganizationDto,
   UpdateOrganizationDto,
   FindOrganizationsDto,
 } from '../dtos'
+import {
+  CreateOrganizationUseCase,
+  UpdateOrganizationUseCase,
+  FindAllOrganizationsUseCase,
+  FindOrganizationByIdUseCase,
+  FindOrganizationByNitUseCase,
+  FindOrganizationsWithFiltersUseCase,
+  UploadLogoUseCase,
+  RemoveOrganizationUseCase,
+  DeleteOrganizationUseCase,
+} from '../use-cases'
 
 @ApiTags('organizations')
 @Controller('organizations')
 export class OrganizationsController {
-  constructor(private readonly organizationsService: OrganizationsService) {}
+  constructor(
+    private readonly createOrganizationUseCase: CreateOrganizationUseCase,
+    private readonly updateOrganizationUseCase: UpdateOrganizationUseCase,
+    private readonly findAllOrganizationsUseCase: FindAllOrganizationsUseCase,
+    private readonly findOrganizationByIdUseCase: FindOrganizationByIdUseCase,
+    private readonly findOrganizationByNitUseCase: FindOrganizationByNitUseCase,
+    private readonly findOrganizationsWithFiltersUseCase: FindOrganizationsWithFiltersUseCase,
+    private readonly uploadLogoUseCase: UploadLogoUseCase,
+    private readonly removeOrganizationUseCase: RemoveOrganizationUseCase,
+    private readonly deleteOrganizationUseCase: DeleteOrganizationUseCase,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -41,7 +61,7 @@ export class OrganizationsController {
     description: 'Ya existe una organización con ese nombre o NIT',
   })
   async create(@Body() createOrganizationDto: CreateOrganizationDto) {
-    return await this.organizationsService.create(createOrganizationDto)
+    return await this.createOrganizationUseCase.execute(createOrganizationDto)
   }
 
   @Get()
@@ -130,7 +150,7 @@ export class OrganizationsController {
     },
   })
   async findAll(@Query() query: FindOrganizationsDto) {
-    return await this.organizationsService.findWithFilters(query)
+    return await this.findOrganizationsWithFiltersUseCase.execute(query)
   }
 
   @Get(':id')
@@ -138,7 +158,7 @@ export class OrganizationsController {
   @ApiResponse({ status: 200, description: 'Organización encontrada' })
   @ApiResponse({ status: 404, description: 'Organización no encontrada' })
   async findOne(@Param('id') id: string) {
-    return await this.organizationsService.findOne(id)
+    return await this.findOrganizationByIdUseCase.execute(id)
   }
 
   @Get('nit/:nit')
@@ -146,7 +166,7 @@ export class OrganizationsController {
   @ApiResponse({ status: 200, description: 'Organización encontrada' })
   @ApiResponse({ status: 404, description: 'Organización no encontrada' })
   async findByNit(@Param('nit') nit: string) {
-    return await this.organizationsService.findByNit(nit)
+    return await this.findOrganizationByNitUseCase.execute(nit)
   }
 
   @Patch(':id')
@@ -164,7 +184,10 @@ export class OrganizationsController {
     @Param('id') id: string,
     @Body() updateOrganizationDto: UpdateOrganizationDto,
   ) {
-    return await this.organizationsService.update(id, updateOrganizationDto)
+    return await this.updateOrganizationUseCase.execute(
+      id,
+      updateOrganizationDto,
+    )
   }
 
   @Post(':id/upload-logo')
@@ -196,7 +219,7 @@ export class OrganizationsController {
       throw new BadRequestException('Debe proporcionar un archivo de logo')
     }
 
-    return await this.organizationsService.uploadLogo(id, file)
+    return await this.uploadLogoUseCase.execute(id, file)
   }
 
   @Delete(':id')
@@ -216,6 +239,6 @@ export class OrganizationsController {
   })
   @ApiResponse({ status: 404, description: 'Organización no encontrada' })
   async remove(@Param('id') id: string) {
-    await this.organizationsService.remove(id)
+    await this.removeOrganizationUseCase.execute(id)
   }
 }

@@ -4,15 +4,17 @@ import { JwtModule } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
 import { APP_GUARD } from '@nestjs/core'
 import type * as ms from 'ms'
-import { AuthController } from './controllers'
+import {
+  AuthController,
+  PasswordResetController,
+  TwoFactorController,
+} from './controllers'
 import {
   TokensService,
-  AuthService,
   ResetPasswordTokenService,
   TwoFactorTokenService,
 } from './services'
 import {
-  ValidateUserUseCase,
   LoginUseCase,
   RefreshTokenUseCase,
   LogoutUseCase,
@@ -22,9 +24,10 @@ import {
   Verify2FACodeUseCase,
   Resend2FACodeUseCase,
 } from './use-cases'
-import { LocalStrategy, JwtStrategy, JwtRefreshStrategy } from './strategies'
+import { JwtStrategy, JwtRefreshStrategy } from './strategies'
 import { JwtAuthGuard } from './guards'
 import { JwtTokenHelper } from './helpers'
+import { LoginRateLimitPolicy, EmailOperationRateLimitPolicy } from './policies'
 
 @Module({
   imports: [
@@ -62,7 +65,7 @@ import { JwtTokenHelper } from './helpers'
     }),
   ],
 
-  controllers: [AuthController],
+  controllers: [AuthController, PasswordResetController, TwoFactorController],
 
   providers: [
     // ========================================
@@ -76,13 +79,19 @@ import { JwtTokenHelper } from './helpers'
     TokensService,
     ResetPasswordTokenService,
     TwoFactorTokenService,
-    AuthService,
+
     ConfigService,
+
+    // ========================================
+    // Policies
+    // ========================================
+    LoginRateLimitPolicy,
+    EmailOperationRateLimitPolicy,
+
     // ========================================
     // Use Cases
     // ========================================
     // Login/Logout/Refresh
-    ValidateUserUseCase,
     LoginUseCase,
     RefreshTokenUseCase,
     LogoutUseCase,
@@ -99,7 +108,6 @@ import { JwtTokenHelper } from './helpers'
     // ========================================
     // Passport Strategies
     // ========================================
-    LocalStrategy,
     JwtStrategy,
     JwtRefreshStrategy,
 
@@ -119,8 +127,7 @@ import { JwtTokenHelper } from './helpers'
   exports: [
     // Exportar helper para otros módulos si lo necesitan
     JwtTokenHelper,
-    // Exportar servicios para otros módulos si lo necesitan
-    AuthService,
+    // Exportar services si otros módulos los necesitan
     TokensService,
     ResetPasswordTokenService,
     TwoFactorTokenService,

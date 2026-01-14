@@ -10,10 +10,16 @@ import {
 } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
+import { RealIp } from '@core/decorators/real-ip.decorator'
+import { CookieService } from '@core/http/services/cookie.service'
 import { LoginDto, LoginResponseDto } from '../dtos'
 import { Public, GetUser } from '../decorators'
 import type { JwtPayload } from '../interfaces'
-import { LoginUseCase, LogoutUseCase, RefreshTokenUseCase } from '../use-cases'
+import {
+  LoginUseCase,
+  LogoutUseCase,
+  RefreshTokenUseCase,
+} from '../use-cases'
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -22,6 +28,7 @@ export class AuthController {
     private readonly loginUseCase: LoginUseCase,
     private readonly refreshTokenUseCase: RefreshTokenUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly cookieService: CookieService,
   ) {}
 
   /**
@@ -30,6 +37,7 @@ export class AuthController {
    * Autentica un usuario con username/email y password
    *
    * @param loginDto - Credenciales de login
+   * @param ip - Dirección IP del usuario (para rate limiting)
    * @param res - Express response para setear cookies
    * @returns Access token y datos del usuario
    *
@@ -61,17 +69,16 @@ export class AuthController {
   })
   async login(
     @Body() loginDto: LoginDto,
-    @Req() req: Request,
+    @RealIp() ip: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<LoginResponseDto> {
-    const ip = this.extractIp(req)
     const { response, refreshToken } = await this.loginUseCase.execute(
       loginDto,
       ip,
     )
 
     // Configurar refresh token en HTTP-only cookie
-    this.setRefreshTokenCookie(res, refreshToken)
+    this.cookieService.setRefreshToken(res, refreshToken)
 
     // Retornar solo access token y datos del usuario
     return response
@@ -117,7 +124,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string }> {
-    const oldRefreshToken = req.cookies?.refreshToken
+    const oldRefreshToken = this.cookieService.getRefreshToken(req)
 
     if (!oldRefreshToken) {
       throw new UnauthorizedException('Refresh token no encontrado')
@@ -126,7 +133,7 @@ export class AuthController {
     const result = await this.refreshTokenUseCase.execute(oldRefreshToken)
 
     // Setear nuevo refresh token (rotation)
-    this.setRefreshTokenCookie(res, result.refreshToken)
+    this.cookieService.setRefreshToken(res, result.refreshToken)
 
     // Retornar nuevo access token
     return {
@@ -173,7 +180,7 @@ export class AuthController {
     const accessToken = this.extractTokenFromHeader(req)
 
     // Extraer refresh token de la cookie
-    const refreshToken = req.cookies?.refreshToken
+    const refreshToken = this.cookieService.getRefreshToken(req)
 
     if (!accessToken) {
       throw new UnauthorizedException('Access token no encontrado')
@@ -183,34 +190,7 @@ export class AuthController {
     await this.logoutUseCase.execute(user.sub, accessToken, refreshToken)
 
     // Limpiar cookie
-    this.clearRefreshTokenCookie(res)
-  }
-
-  /**
-   * Helper: Configura el refresh token en cookie HTTP-only
-   */
-  private setRefreshTokenCookie(res: Response, refreshToken: string): void {
-    const isProduction = process.env.NODE_ENV === 'production'
-
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true, // No accesible desde JavaScript (seguridad XSS)
-      secure: isProduction, // Solo HTTPS en producción
-      sameSite: 'strict', // Protección CSRF
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días en milisegundos
-      path: '/', // Disponible en toda la app
-    })
-  }
-
-  /**
-   * Helper: Limpia la cookie del refresh token
-   */
-  private clearRefreshTokenCookie(res: Response): void {
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    })
+    this.cookieService.clearRefreshToken(res)
   }
 
   /**
@@ -222,31 +202,5 @@ export class AuthController {
 
     const [type, token] = authHeader.split(' ')
     return type === 'Bearer' ? token : undefined
-  }
-
-  /**
-   * Helper: Extrae la IP real del request (considera proxies)
-   *
-   * Prioridad:
-   * 1. X-Forwarded-For (si está detrás de un proxy/load balancer)
-   * 2. X-Real-IP (alternativa común)
-   * 3. req.ip (directo de Express)
-   */
-  private extractIp(req: Request): string {
-    const forwardedFor = req.headers['x-forwarded-for']
-    if (forwardedFor) {
-      // X-Forwarded-For puede ser una lista: "client, proxy1, proxy2"
-      const ips = Array.isArray(forwardedFor)
-        ? forwardedFor[0]
-        : forwardedFor.split(',')[0]
-      return ips.trim()
-    }
-
-    const realIp = req.headers['x-real-ip']
-    if (realIp && typeof realIp === 'string') {
-      return realIp.trim()
-    }
-
-    return req.ip || 'unknown'
   }
 }

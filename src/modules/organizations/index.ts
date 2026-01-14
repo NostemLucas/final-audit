@@ -14,7 +14,8 @@
 export * from './organizations.module'
 
 // 2. Service (si otros módulos lo necesitan)
-export * from './services/organizations.service'
+// NOTA: Comentado temporalmente - el archivo no existe aún
+// export * from './services/organizations.service'
 
 // 3. Exceptions (para manejo de errores en otros módulos)
 export * from './exceptions'

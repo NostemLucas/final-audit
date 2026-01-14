@@ -12,6 +12,7 @@ export const REDIS_PREFIXES = {
   RESET_PASSWORD: 'auth:reset-pw',
   TWO_FACTOR: 'auth:2fa',
   EMAIL_VERIFICATION: 'auth:verify-email',
+  RATE_LIMIT: 'rate-limit',
 } as const
 
 export type RedisPrefix = (typeof REDIS_PREFIXES)[keyof typeof REDIS_PREFIXES]
@@ -43,4 +44,23 @@ export const CACHE_KEYS = {
     `${REDIS_PREFIXES.RESET_PASSWORD}:${userId}:*`,
   USER_2FA_CODES: (userId: string) =>
     `${REDIS_PREFIXES.TWO_FACTOR}:${userId}:*`,
+
+  // Rate Limiting Keys
+  LOGIN_ATTEMPTS_IP: (ip: string) =>
+    `${REDIS_PREFIXES.RATE_LIMIT}:login:ip:${ip}`,
+
+  LOGIN_ATTEMPTS_USER: (userIdentifier: string) =>
+    `${REDIS_PREFIXES.RATE_LIMIT}:login:user:${userIdentifier.toLowerCase()}`,
+
+  RESET_PASSWORD_ATTEMPTS_IP: (ip: string) =>
+    `${REDIS_PREFIXES.RATE_LIMIT}:reset-password:ip:${ip}`,
+
+  TWO_FACTOR_ATTEMPTS: (userId: string, operation: string) =>
+    `${REDIS_PREFIXES.RATE_LIMIT}:2fa:${operation}:${userId}`,
+
+  TWO_FACTOR_VERIFY_ATTEMPTS: (tokenId: string) =>
+    `${REDIS_PREFIXES.RATE_LIMIT}:2fa:verify:token:${tokenId}`,
+
+  TWO_FACTOR_CODE: (tokenId: string) =>
+    `${REDIS_PREFIXES.TWO_FACTOR}:code:${tokenId}`,
 } as const

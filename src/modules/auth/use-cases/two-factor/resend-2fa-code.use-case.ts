@@ -1,6 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common'
 import { EmailService } from '@core/email'
 import { TwoFactorTokenService } from '../../services/two-factor-token.service'
+import { EmailOperationRateLimitPolicy } from '../../policies'
 import { USERS_REPOSITORY } from '../../../users/tokens'
 import type { IUsersRepository } from '../../../users/repositories'
 
@@ -8,6 +9,7 @@ import type { IUsersRepository } from '../../../users/repositories'
  * Use Case: Reenviar código 2FA
  *
  * Responsabilidades:
+ * - Verificar rate limiting (previene spam de códigos)
  * - Verificar que el usuario existe
  * - Revocar códigos anteriores (si existen)
  * - Generar nuevo código
@@ -15,6 +17,7 @@ import type { IUsersRepository } from '../../../users/repositories'
  * - Devolver nuevo token JWT
  *
  * Seguridad:
+ * - Rate limiting: 5 intentos en 5 minutos
  * - Revoca códigos anteriores para evitar que se use el viejo
  * - Genera nuevo código con nueva expiración
  */
@@ -25,6 +28,7 @@ export class Resend2FACodeUseCase {
     private readonly usersRepository: IUsersRepository,
     private readonly twoFactorTokenService: TwoFactorTokenService,
     private readonly emailService: EmailService,
+    private readonly emailOperationRateLimitPolicy: EmailOperationRateLimitPolicy,
   ) {}
 
   /**
@@ -33,30 +37,40 @@ export class Resend2FACodeUseCase {
    * @param userId - ID del usuario
    * @returns Nuevo token JWT y mensaje de confirmación
    * @throws NotFoundException si el usuario no existe
+   * @throws TooManyAttemptsException si excede intentos
    */
   async execute(userId: string): Promise<{ token: string; message: string }> {
-    // Buscar usuario
+    // 1. Buscar usuario
     const user = await this.usersRepository.findById(userId)
 
     if (!user) {
       throw new NotFoundException('Usuario no encontrado')
     }
 
-    // Revocar códigos anteriores
+    // 2. Verificar rate limiting
+    await this.emailOperationRateLimitPolicy.check2FALimit(userId, 'resend')
+
+    // 3. Revocar códigos anteriores
     await this.twoFactorTokenService.revokeAllUserCodes(userId)
 
-    // Generar nuevo código
+    // 4. Generar nuevo código
     const { code, token } = await this.twoFactorTokenService.generateCode(
       user.id,
     )
 
-    // Enviar código por email
+    // 5. Enviar código por email
     await this.emailService.sendTwoFactorCode({
       to: user.email,
       userName: user.username,
       code,
       expiresInMinutes: 5,
     })
+
+    // 6. Incrementar contador
+    await this.emailOperationRateLimitPolicy.increment2FAAttempt(
+      userId,
+      'resend',
+    )
 
     return {
       token,

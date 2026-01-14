@@ -1,9 +1,16 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import Redis from 'ioredis'
 import * as crypto from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
-import { TokenStorageService, REDIS_PREFIXES } from '@core/cache'
+import {
+  TokenStorageService,
+  REDIS_PREFIXES,
+  CACHE_KEYS,
+  REDIS_CLIENT,
+} from '@core/cache'
 import { RateLimitService } from '@core/security'
+import { RATE_LIMIT_CONFIG } from '../config/rate-limit.config'
 import { JwtTokenHelper } from '../helpers'
 import { TooManyAttemptsException } from '../exceptions'
 
@@ -38,14 +45,15 @@ export class TwoFactorTokenService {
   private readonly codeLength: number
   private readonly codeExpiry: string
   private readonly jwtSecret: string
-  private readonly maxAttempts = 5 // Máximo 5 intentos
-  private readonly attemptsWindow = 5 // Ventana de 5 minutos
+  private readonly maxAttempts = RATE_LIMIT_CONFIG.twoFactor.maxAttempts
+  private readonly attemptsWindow = RATE_LIMIT_CONFIG.twoFactor.windowMinutes
 
   constructor(
     private readonly tokenStorage: TokenStorageService,
     private readonly jwtTokenHelper: JwtTokenHelper,
     private readonly configService: ConfigService,
     private readonly rateLimitService: RateLimitService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
     this.codeLength = configService.get('TWO_FACTOR_CODE_LENGTH', 6)
     this.codeExpiry = configService.get('TWO_FACTOR_CODE_EXPIRES_IN', '5m')
@@ -135,7 +143,7 @@ export class TwoFactorTokenService {
     const { tokenId } = payload
 
     // 2. Verificar rate limiting por tokenId
-    const rateLimitKey = `2fa:attempts:${tokenId}`
+    const rateLimitKey = CACHE_KEYS.TWO_FACTOR_VERIFY_ATTEMPTS(tokenId)
     const canAttempt = await this.rateLimitService.checkLimit(
       rateLimitKey,
       this.maxAttempts,
@@ -202,49 +210,40 @@ export class TwoFactorTokenService {
 
   /**
    * Almacena el código en Redis usando tokenId como clave
-   * Key: 2fa:code:{tokenId}
+   * Key: auth:2fa:code:{tokenId}
    * Value: "123456"
    */
   private async storeCodeInRedis(tokenId: string, code: string): Promise<void> {
-    const key = `2fa:code:${tokenId}`
+    const key = CACHE_KEYS.TWO_FACTOR_CODE(tokenId)
     const ttlSeconds = this.jwtTokenHelper.getExpirySeconds(
       this.codeExpiry,
       300,
     )
 
-    await this.tokenStorage.storeToken(tokenId, code, {
-      prefix: REDIS_PREFIXES.TWO_FACTOR,
-      ttlSeconds,
-    })
+    await this.redis.setex(key, ttlSeconds, code)
   }
 
   /**
    * Obtiene el código de Redis usando tokenId
    */
   private async getCodeFromRedis(tokenId: string): Promise<string | null> {
-    const isValid = await this.tokenStorage.validateToken(
-      tokenId,
-      '', // No necesitamos el token aquí, solo verificamos existencia
-      REDIS_PREFIXES.TWO_FACTOR,
-    )
+    const key = CACHE_KEYS.TWO_FACTOR_CODE(tokenId)
 
-    if (!isValid) {
+    try {
+      const code = await this.redis.get(key)
+      return code || null
+    } catch (error) {
+      // Log error pero no expongas detalles al cliente
       return null
     }
-
-    // Obtener el código directamente
-    // Nota: TokenStorageService guarda como {prefix}:{userId}:{token}
-    // Necesitamos obtener el valor almacenado
-    // Por ahora retornamos null si no existe, la validación falla
-    return null
   }
 
   /**
    * Elimina el código de Redis
    */
   private async deleteCodeFromRedis(tokenId: string): Promise<void> {
-    // Revocar el token que corresponde a este tokenId
-    await this.tokenStorage.revokeToken(tokenId, '', REDIS_PREFIXES.TWO_FACTOR)
+    const key = CACHE_KEYS.TWO_FACTOR_CODE(tokenId)
+    await this.redis.del(key)
   }
 
   /**
@@ -291,7 +290,7 @@ export class TwoFactorTokenService {
    * Obtiene los intentos restantes para un tokenId
    */
   async getRemainingAttempts(tokenId: string): Promise<number> {
-    const rateLimitKey = `2fa:attempts:${tokenId}`
+    const rateLimitKey = CACHE_KEYS.TWO_FACTOR_VERIFY_ATTEMPTS(tokenId)
     return await this.rateLimitService.getRemainingAttempts(
       rateLimitKey,
       this.maxAttempts,

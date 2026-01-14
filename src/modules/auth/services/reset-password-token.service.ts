@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { TokenStorageService, REDIS_PREFIXES } from '@core/cache'
+import { TokenStorageService, REDIS_PREFIXES, CACHE_KEYS } from '@core/cache'
 import { RateLimitService } from '@core/security'
+import { RATE_LIMIT_CONFIG } from '../config/rate-limit.config'
 import { JwtTokenHelper } from '../helpers'
 import { TooManyAttemptsException } from '../exceptions'
 
@@ -34,9 +35,10 @@ export interface ResetPasswordPayload {
 export class ResetPasswordTokenService {
   private readonly tokenExpiry: string
   private readonly jwtSecret: string
-  private readonly maxAttemptsByIp = 10 // Máximo 10 intentos por IP
-  private readonly maxAttemptsByEmail = 5 // Máximo 5 intentos por email
-  private readonly attemptsWindow = 60 // Ventana de 60 minutos
+  private readonly maxAttemptsByIp =
+    RATE_LIMIT_CONFIG.resetPassword.maxAttemptsByIp
+  private readonly attemptsWindow =
+    RATE_LIMIT_CONFIG.resetPassword.windowMinutes
 
   constructor(
     private readonly tokenStorage: TokenStorageService,
@@ -109,7 +111,7 @@ export class ResetPasswordTokenService {
    */
   async validateToken(token: string, ip: string): Promise<string | null> {
     // 1. Verificar rate limiting por IP
-    const rateLimitKeyIp = `reset-password:attempts:ip:${ip}`
+    const rateLimitKeyIp = CACHE_KEYS.RESET_PASSWORD_ATTEMPTS_IP(ip)
     const canAttemptByIp = await this.rateLimitService.checkLimit(
       rateLimitKeyIp,
       this.maxAttemptsByIp,
