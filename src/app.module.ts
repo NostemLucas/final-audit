@@ -18,6 +18,8 @@ import { UsersModule } from './modules/users'
 import { OrganizationsModule } from './modules/organizations'
 import { AuthModule } from './modules/auth'
 import { AuthorizationModule, PermissionsGuard } from './modules/authorization'
+import { TemplatesModule } from './modules/templates'
+import { MaturityModule } from './modules/maturity'
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { AuthorizationModule, PermissionsGuard } from './modules/authorization'
     // Feature modules
     OrganizationsModule,
     UsersModule,
+    TemplatesModule,
+    MaturityModule,
   ],
   controllers: [AppController],
   providers: [
