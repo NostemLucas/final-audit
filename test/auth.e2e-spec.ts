@@ -293,39 +293,276 @@ describe('AuthController (E2E) - Complete Integration Tests', () => {
   })
 
   describe('2FA Flow - Complete Integration', () => {
-    let twoFactorCode: string
-    let twoFactorToken: string
+    it('should generate 2FA code via endpoint', async () => {
+      // Act - Generate 2FA code
+      const response = await request(app.getHttpServer())
+        .post('/auth/2fa/generate')
+        .send({ userId: testUser.id })
+        .expect(200)
 
-    it('should generate 2FA code and store in Redis', async () => {
-      // Note: In a real app, this would be triggered during login
-      // For testing, we'll directly test the 2FA service through an endpoint
+      // Assert - Response should contain token (not the code)
+      expect(response.body).toHaveProperty('token')
+      expect(response.body.token).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/)
 
-      // This test verifies that 2FA codes are stored in Redis
-      // In your actual implementation, add an endpoint to generate 2FA codes for testing
-      // For now, we'll verify the Redis storage mechanism
-
+      // Verify 2FA code is stored in Redis
       const keys = await redis.keys(`auth:2fa:${testUser.id}:*`)
-      // After a real 2FA generation, there should be a key
-      expect(Array.isArray(keys)).toBe(true)
+      expect(keys.length).toBeGreaterThan(0)
     })
 
-    // Add more 2FA tests when you have the endpoints ready
-    // Example: POST /auth/2fa/send, POST /auth/2fa/verify
+    it('should verify valid 2FA code', async () => {
+      // Arrange - Generate code first
+      const genResponse = await request(app.getHttpServer())
+        .post('/auth/2fa/generate')
+        .send({ userId: testUser.id })
+
+      const { token } = genResponse.body
+
+      // Get the actual code from Redis (in real app, it's sent via email/SMS)
+      const keys = await redis.keys(`auth:2fa:${testUser.id}:*`)
+      const codeData = await redis.get(keys[0])
+      const code = codeData // Assuming the code is stored directly
+
+      // Act - Verify the code
+      const response = await request(app.getHttpServer())
+        .post('/auth/2fa/verify')
+        .send({
+          userId: testUser.id,
+          code,
+          token,
+        })
+        .expect(200)
+
+      // Assert
+      expect(response.body).toHaveProperty('valid', true)
+
+      // Verify code is deleted after successful validation (one-time use)
+      const keysAfter = await redis.keys(`auth:2fa:${testUser.id}:*`)
+      expect(keysAfter.length).toBe(0)
+    })
+
+    it('should fail with invalid 2FA code', async () => {
+      // Arrange
+      const genResponse = await request(app.getHttpServer())
+        .post('/auth/2fa/generate')
+        .send({ userId: testUser.id })
+
+      const { token } = genResponse.body
+
+      // Act - Try with wrong code
+      await request(app.getHttpServer())
+        .post('/auth/2fa/verify')
+        .send({
+          userId: testUser.id,
+          code: '000000', // Wrong code
+          token,
+        })
+        .expect(401)
+    })
+
+    it('should fail to reuse 2FA code (one-time use)', async () => {
+      // Arrange - Generate and verify code
+      const genResponse = await request(app.getHttpServer())
+        .post('/auth/2fa/generate')
+        .send({ userId: testUser.id })
+
+      const { token } = genResponse.body
+      const keys = await redis.keys(`auth:2fa:${testUser.id}:*`)
+      const code = await redis.get(keys[0])
+
+      // First verification - should succeed
+      await request(app.getHttpServer())
+        .post('/auth/2fa/verify')
+        .send({ userId: testUser.id, code, token })
+        .expect(200)
+
+      // Act - Try to reuse the same code
+      await request(app.getHttpServer())
+        .post('/auth/2fa/verify')
+        .send({ userId: testUser.id, code, token })
+        .expect(401) // Should fail - code already used
+    })
+
+    it('should resend 2FA code', async () => {
+      // Arrange - Generate initial code
+      await request(app.getHttpServer())
+        .post('/auth/2fa/generate')
+        .send({ userId: testUser.id })
+
+      // Act - Resend code
+      const response = await request(app.getHttpServer())
+        .post('/auth/2fa/resend')
+        .send({ userId: testUser.id })
+        .expect(200)
+
+      // Assert - New token should be generated
+      expect(response.body).toHaveProperty('token')
+
+      // Verify new code in Redis
+      const keys = await redis.keys(`auth:2fa:${testUser.id}:*`)
+      expect(keys.length).toBeGreaterThan(0)
+    })
   })
 
   describe('Reset Password Flow - Hybrid Token (JWT + Redis)', () => {
-    // Add reset password tests when endpoints are ready
-    // Example: POST /auth/forgot-password, POST /auth/reset-password
+    it('should request password reset and generate token', async () => {
+      // Act - Request password reset
+      const response = await request(app.getHttpServer())
+        .post('/auth/password/request-reset')
+        .send({ email: testUser.email })
+        .expect(200)
 
-    it('should generate reset password token (hybrid mode)', async () => {
-      // This will test the hybrid token generation:
-      // 1. Generate JWT with userId and tokenId
-      // 2. Store tokenId in Redis with TTL
-      // 3. Validate JWT signature
-      // 4. Check Redis for revocation
-      //
-      // Add this test when you have the endpoints implemented
-      expect(true).toBe(true)
+      // Assert - Generic message (doesn't reveal if email exists)
+      expect(response.body.message).toContain('Si el email existe')
+
+      // Verify token is stored in Redis
+      const keys = await redis.keys(`auth:reset-password:${testUser.id}:*`)
+      expect(keys.length).toBeGreaterThan(0)
+
+      // Verify TTL is set (should be 1 hour = 3600 seconds)
+      const ttl = await redis.ttl(keys[0])
+      expect(ttl).toBeGreaterThan(0)
+      expect(ttl).toBeLessThanOrEqual(3600)
+    })
+
+    it('should not reveal if email does not exist', async () => {
+      // Act - Request reset for non-existent email
+      const response = await request(app.getHttpServer())
+        .post('/auth/password/request-reset')
+        .send({ email: 'nonexistent@example.com' })
+        .expect(200)
+
+      // Assert - Same message as valid email (timing attack prevention)
+      expect(response.body.message).toContain('Si el email existe')
+    })
+
+    it('should reset password with valid token', async () => {
+      // Arrange - Request password reset first
+      await request(app.getHttpServer())
+        .post('/auth/password/request-reset')
+        .send({ email: testUser.email })
+
+      // Get the token from Redis (in real app, it's sent via email)
+      const keys = await redis.keys(`auth:reset-password:${testUser.id}:*`)
+      const tokenId = keys[0].split(':').pop()
+
+      // Generate a JWT token (simulating the token from email)
+      // In real scenario, this would come from the email link
+      const resetToken = `mock-jwt-token-${tokenId}`
+
+      const newPassword = 'NewSecure123!@#'
+
+      // Act - Reset password
+      const response = await request(app.getHttpServer())
+        .post('/auth/password/reset')
+        .send({
+          token: resetToken,
+          newPassword,
+        })
+        .expect(200)
+
+      // Assert
+      expect(response.body.message).toContain('actualizada exitosamente')
+
+      // Verify token is revoked from Redis (one-time use)
+      const keysAfter = await redis.keys(`auth:reset-password:${testUser.id}:*`)
+      expect(keysAfter.length).toBe(0)
+
+      // Verify all refresh tokens are revoked (security measure)
+      const refreshKeys = await redis.keys(`auth:refresh:${testUser.id}:*`)
+      expect(refreshKeys.length).toBe(0)
+
+      // Verify can login with new password
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: testUser.email,
+          password: newPassword,
+        })
+        .expect(200)
+
+      expect(loginResponse.body).toHaveProperty('accessToken')
+
+      // Update test user password for future tests
+      testUser.password = newPassword
+    })
+
+    it('should fail with invalid reset token', async () => {
+      // Act & Assert
+      await request(app.getHttpServer())
+        .post('/auth/password/reset')
+        .send({
+          token: 'invalid.jwt.token',
+          newPassword: 'NewSecure123!@#',
+        })
+        .expect(400)
+    })
+
+    it('should fail with expired reset token', async () => {
+      // Arrange - Request reset
+      await request(app.getHttpServer())
+        .post('/auth/password/request-reset')
+        .send({ email: testUser.email })
+
+      // Get token
+      const keys = await redis.keys(`auth:reset-password:${testUser.id}:*`)
+      const tokenId = keys[0].split(':').pop()
+      const resetToken = `mock-jwt-token-${tokenId}`
+
+      // Manually delete from Redis (simulate expiration)
+      await redis.del(keys[0])
+
+      // Act & Assert - Token should be invalid
+      await request(app.getHttpServer())
+        .post('/auth/password/reset')
+        .send({
+          token: resetToken,
+          newPassword: 'NewSecure123!@#',
+        })
+        .expect(400)
+    })
+
+    it('should fail to reuse reset token (one-time use)', async () => {
+      // Arrange - Request and use token
+      await request(app.getHttpServer())
+        .post('/auth/password/request-reset')
+        .send({ email: testUser.email })
+
+      const keys = await redis.keys(`auth:reset-password:${testUser.id}:*`)
+      const tokenId = keys[0].split(':').pop()
+      const resetToken = `mock-jwt-token-${tokenId}`
+
+      // First use - should succeed
+      await request(app.getHttpServer())
+        .post('/auth/password/reset')
+        .send({
+          token: resetToken,
+          newPassword: 'NewSecure123!@#',
+        })
+        .expect(200)
+
+      // Act - Try to reuse token
+      await request(app.getHttpServer())
+        .post('/auth/password/reset')
+        .send({
+          token: resetToken,
+          newPassword: 'AnotherPassword123!',
+        })
+        .expect(400) // Should fail - token already used
+    })
+
+    it('should enforce rate limiting on reset requests', async () => {
+      // Act - Send multiple reset requests rapidly
+      const requests = Array.from({ length: 15 }, () =>
+        request(app.getHttpServer())
+          .post('/auth/password/request-reset')
+          .send({ email: testUser.email }),
+      )
+
+      const responses = await Promise.all(requests)
+
+      // Assert - Some requests should be rate limited (429)
+      const rateLimited = responses.filter((r) => r.status === 429)
+      expect(rateLimited.length).toBeGreaterThan(0)
     })
   })
 

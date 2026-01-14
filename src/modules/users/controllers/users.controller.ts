@@ -35,7 +35,7 @@ import {
 import { CreateUserDto, UpdateUserDto } from '../dtos'
 import { UserEntity } from '../entities/user.entity'
 import { UploadAvatar } from '@core/files'
-import { Public } from 'src/modules/auth'
+import { Public } from '../../auth'
 
 @ApiTags('users')
 @Controller('users')
