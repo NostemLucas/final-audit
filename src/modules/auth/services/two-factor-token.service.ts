@@ -143,9 +143,8 @@ export class TwoFactorTokenService {
     )
 
     if (!canAttempt) {
-      const remaining = await this.rateLimitService.getTimeUntilReset(
-        rateLimitKey,
-      )
+      const remaining =
+        await this.rateLimitService.getTimeUntilReset(rateLimitKey)
       throw new TooManyAttemptsException(
         `Demasiados intentos fallidos. Intenta de nuevo en ${Math.ceil(remaining / 60)} minutos.`,
       )
@@ -206,12 +205,12 @@ export class TwoFactorTokenService {
    * Key: 2fa:code:{tokenId}
    * Value: "123456"
    */
-  private async storeCodeInRedis(
-    tokenId: string,
-    code: string,
-  ): Promise<void> {
+  private async storeCodeInRedis(tokenId: string, code: string): Promise<void> {
     const key = `2fa:code:${tokenId}`
-    const ttlSeconds = this.jwtTokenHelper.getExpirySeconds(this.codeExpiry, 300)
+    const ttlSeconds = this.jwtTokenHelper.getExpirySeconds(
+      this.codeExpiry,
+      300,
+    )
 
     await this.tokenStorage.storeToken(tokenId, code, {
       prefix: REDIS_PREFIXES.TWO_FACTOR,
@@ -245,11 +244,7 @@ export class TwoFactorTokenService {
    */
   private async deleteCodeFromRedis(tokenId: string): Promise<void> {
     // Revocar el token que corresponde a este tokenId
-    await this.tokenStorage.revokeToken(
-      tokenId,
-      '',
-      REDIS_PREFIXES.TWO_FACTOR,
-    )
+    await this.tokenStorage.revokeToken(tokenId, '', REDIS_PREFIXES.TWO_FACTOR)
   }
 
   /**

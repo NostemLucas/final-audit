@@ -61,9 +61,8 @@ export class ValidateUserUseCase {
     )
 
     if (!canAttemptByIp) {
-      const remaining = await this.rateLimitService.getTimeUntilReset(
-        rateLimitKeyIp,
-      )
+      const remaining =
+        await this.rateLimitService.getTimeUntilReset(rateLimitKeyIp)
       throw new TooManyAttemptsException(
         `Demasiados intentos desde esta IP. Intenta de nuevo en ${Math.ceil(remaining / 60)} minutos.`,
       )
@@ -79,9 +78,8 @@ export class ValidateUserUseCase {
     )
 
     if (!canAttemptByUser) {
-      const remaining = await this.rateLimitService.getTimeUntilReset(
-        rateLimitKeyUser,
-      )
+      const remaining =
+        await this.rateLimitService.getTimeUntilReset(rateLimitKeyUser)
       throw new TooManyAttemptsException(
         `Demasiados intentos fallidos para este usuario. Intenta de nuevo en ${Math.ceil(remaining / 60)} minutos.`,
       )

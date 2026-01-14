@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common'
 import { Logger as TypeOrmLogger, QueryRunner } from 'typeorm'
 import { format } from 'sql-formatter'
 import { BaseLogger } from './base.logger'
@@ -10,14 +11,13 @@ interface DatabaseError {
   clientVersion?: string
 }
 
+@Injectable()
 export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
-  private readonly slowQueryThreshold: number
-  private readonly enableQueryFormatting: boolean
+  private readonly slowQueryThreshold = 1000
+  private readonly enableQueryFormatting = true
 
-  constructor(slowQueryThreshold = 1000, enableQueryFormatting = true) {
+  constructor() {
     super('database')
-    this.slowQueryThreshold = slowQueryThreshold
-    this.enableQueryFormatting = enableQueryFormatting
   }
 
   /**
@@ -50,17 +50,22 @@ export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
   /**
    * Logs query and parameters used in it.
    */
-  logQuery(query: string, parameters?: unknown[], _queryRunner?: QueryRunner) {
+  logQuery(query: string, parameters?: unknown[], queryRunner?: QueryRunner) {
     const formattedQuery = this.formatQuery(query, parameters)
+
+    // Detectar si la query está dentro de una transacción
+    const isTransaction = queryRunner?.isTransactionActive ?? false
+    const transactionMarker = isTransaction ? ' [TRX]' : ''
 
     const context: DatabaseLogContext = {
       database: {
-        operation: 'QUERY',
+        operation: 'QUERY' + transactionMarker,
         errorMessage: '',
       },
       query: formattedQuery,
       additionalData: {
         duration: '0ms',
+        inTransaction: isTransaction,
       },
     }
 
@@ -74,18 +79,25 @@ export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
     error: string | Error,
     query: string,
     parameters?: unknown[],
-    _queryRunner?: QueryRunner,
+    queryRunner?: QueryRunner,
   ) {
     const errorMessage = error instanceof Error ? error.message : error
     const formattedQuery = this.formatQuery(query, parameters)
 
+    // Detectar si el error ocurrió dentro de una transacción
+    const isTransaction = queryRunner?.isTransactionActive ?? false
+    const transactionMarker = isTransaction ? ' [TRX]' : ''
+
     const context: DatabaseLogContext = {
       database: {
-        operation: 'QUERY_EXECUTION',
+        operation: 'QUERY_EXECUTION' + transactionMarker,
         errorCode: 'QUERY_ERROR',
         errorMessage,
       },
       query: formattedQuery,
+      additionalData: {
+        inTransaction: isTransaction,
+      },
     }
 
     this.internalWriteLog(
@@ -102,13 +114,17 @@ export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
     time: number,
     query: string,
     parameters?: unknown[],
-    _queryRunner?: QueryRunner,
+    queryRunner?: QueryRunner,
   ) {
     const formattedQuery = this.formatQuery(query, parameters)
 
+    // Detectar si la slow query está dentro de una transacción
+    const isTransaction = queryRunner?.isTransactionActive ?? false
+    const transactionMarker = isTransaction ? ' [TRX]' : ''
+
     const context: DatabaseLogContext = {
       database: {
-        operation: 'SLOW_QUERY',
+        operation: 'SLOW_QUERY' + transactionMarker,
         errorMessage: '',
       },
       query: formattedQuery,
@@ -116,6 +132,7 @@ export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
         duration: `${time}ms`,
         threshold: `${this.slowQueryThreshold}ms`,
         exceeded: `${time - this.slowQueryThreshold}ms`,
+        inTransaction: isTransaction,
       },
     }
 
@@ -129,14 +146,19 @@ export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
   /**
    * Logs events from the schema build process.
    */
-  logSchemaBuild(message: string, _queryRunner?: QueryRunner) {
+  logSchemaBuild(message: string, queryRunner?: QueryRunner) {
+    // Detectar si el schema build está dentro de una transacción
+    const isTransaction = queryRunner?.isTransactionActive ?? false
+    const transactionMarker = isTransaction ? ' [TRX]' : ''
+
     const context: DatabaseLogContext = {
       database: {
-        operation: 'SCHEMA_BUILD',
+        operation: 'SCHEMA_BUILD' + transactionMarker,
         errorMessage: '',
       },
       additionalData: {
         message,
+        inTransaction: isTransaction,
       },
     }
 
@@ -146,14 +168,19 @@ export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
   /**
    * Logs events from the migrations run process.
    */
-  logMigration(message: string, _queryRunner?: QueryRunner) {
+  logMigration(message: string, queryRunner?: QueryRunner) {
+    // Detectar si la migración está dentro de una transacción
+    const isTransaction = queryRunner?.isTransactionActive ?? false
+    const transactionMarker = isTransaction ? ' [TRX]' : ''
+
     const context: DatabaseLogContext = {
       database: {
-        operation: 'MIGRATION',
+        operation: 'MIGRATION' + transactionMarker,
         errorMessage: '',
       },
       additionalData: {
         message,
+        inTransaction: isTransaction,
       },
     }
 
@@ -168,32 +195,55 @@ export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
   log(
     level: 'log' | 'info' | 'warn',
     message: string | number | boolean,
-    _queryRunner?: QueryRunner,
+    queryRunner?: QueryRunner,
   ) {
     // Convertir nivel de TypeORM a nuestro LogLevel
     let logLevel: LogLevel
+    let operation = 'GENERAL'
 
-    switch (level) {
-      case 'warn':
-        logLevel = LogLevel.WARN
-        break
-      case 'info':
-        logLevel = LogLevel.INFO
-        break
-      case 'log':
-      default:
-        logLevel = LogLevel.DEBUG
-        break
+    // Detectar tipo de operación basado en el mensaje
+    const messageStr = String(message)
+    if (messageStr.includes('schema') || messageStr.includes('Schema')) {
+      operation = 'SCHEMA'
+      logLevel = LogLevel.INFO
+    } else if (
+      messageStr.includes('migration') ||
+      messageStr.includes('Migration')
+    ) {
+      operation = 'MIGRATION'
+      logLevel = LogLevel.INFO
+    } else {
+      // Mapeo estándar de niveles
+      switch (level) {
+        case 'warn':
+          logLevel = LogLevel.WARN
+          break
+        case 'info':
+          logLevel = LogLevel.INFO
+          break
+        case 'log':
+        default:
+          logLevel = LogLevel.DEBUG
+          break
+      }
     }
+
+    // Detectar si está dentro de una transacción
+    const isTransaction = queryRunner?.isTransactionActive ?? false
+    const transactionMarker = isTransaction ? ' [TRX]' : ''
 
     const context: DatabaseLogContext = {
       database: {
-        operation: 'GENERAL',
+        operation: operation + transactionMarker,
         errorMessage: '',
+      },
+      additionalData: {
+        originalLevel: level,
+        inTransaction: isTransaction,
       },
     }
 
-    this.internalWriteLog(logLevel, String(message), context)
+    this.internalWriteLog(logLevel, messageStr, context)
   }
 
   /**

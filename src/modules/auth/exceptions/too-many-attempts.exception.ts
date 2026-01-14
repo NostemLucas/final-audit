@@ -22,7 +22,8 @@ export class TooManyAttemptsException extends HttpException {
     super(
       {
         statusCode: HttpStatus.TOO_MANY_REQUESTS,
-        message: message || 'Demasiados intentos. Por favor, intenta más tarde.',
+        message:
+          message || 'Demasiados intentos. Por favor, intenta más tarde.',
         error: 'Too Many Attempts',
       },
       HttpStatus.TOO_MANY_REQUESTS,

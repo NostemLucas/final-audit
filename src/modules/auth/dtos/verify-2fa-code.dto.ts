@@ -44,9 +44,13 @@ export class Verify2FACodeDto {
     maxLength: TWO_FACTOR_CONSTRAINTS.CODE.LENGTH,
   })
   @IsString({ message: 'El código debe ser una cadena de texto' })
-  @Length(TWO_FACTOR_CONSTRAINTS.CODE.LENGTH, TWO_FACTOR_CONSTRAINTS.CODE.LENGTH, {
-    message: `El código debe tener exactamente ${TWO_FACTOR_CONSTRAINTS.CODE.LENGTH} dígitos`,
-  })
+  @Length(
+    TWO_FACTOR_CONSTRAINTS.CODE.LENGTH,
+    TWO_FACTOR_CONSTRAINTS.CODE.LENGTH,
+    {
+      message: `El código debe tener exactamente ${TWO_FACTOR_CONSTRAINTS.CODE.LENGTH} dígitos`,
+    },
+  )
   @Matches(TWO_FACTOR_CONSTRAINTS.CODE.PATTERN, {
     message: TWO_FACTOR_CONSTRAINTS.CODE.MESSAGE,
   })
@@ -54,7 +58,8 @@ export class Verify2FACodeDto {
   code: string
 
   @ApiProperty({
-    description: 'Token JWT requerido para validación (vincula sesión con código)',
+    description:
+      'Token JWT requerido para validación (vincula sesión con código)',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
     required: true,
     minLength: TWO_FACTOR_CONSTRAINTS.TOKEN.MIN,

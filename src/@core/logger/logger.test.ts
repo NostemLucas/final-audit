@@ -7,7 +7,7 @@ import { TypeOrmDatabaseLogger } from './loggers/typeorm-database.logger'
 import { BaseLogger } from './loggers/base.logger'
 
 // Crear una instancia del logger de base de datos
-const dbLogger = new TypeOrmDatabaseLogger(1000, true)
+const dbLogger = new TypeOrmDatabaseLogger()
 
 // Crear una instancia del logger base
 const logger = new BaseLogger('example')

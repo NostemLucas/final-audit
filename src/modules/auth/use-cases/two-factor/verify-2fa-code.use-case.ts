@@ -17,9 +17,7 @@ import { TwoFactorTokenService } from '../../services/two-factor-token.service'
  */
 @Injectable()
 export class Verify2FACodeUseCase {
-  constructor(
-    private readonly twoFactorTokenService: TwoFactorTokenService,
-  ) {}
+  constructor(private readonly twoFactorTokenService: TwoFactorTokenService) {}
 
   /**
    * Ejecuta el flujo de verificación de código 2FA

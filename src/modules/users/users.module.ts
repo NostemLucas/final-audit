@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common'
 import { UsersController } from './controllers/users.controller'
-import { UsersService } from './services/users.service'
 import { UserValidator } from './validators/user.validator'
 import { UserFactory } from './factories/user.factory'
 import {
@@ -19,8 +18,6 @@ import {
   imports: [],
   controllers: [UsersController],
   providers: [
-    // Service (facade)
-    UsersService,
     // Use Cases
     CreateUserUseCase,
     UpdateUserUseCase,
@@ -35,6 +32,6 @@ import {
     UserValidator,
     UserFactory,
   ],
-  exports: [UserFactory],
+  exports: [],
 })
 export class UsersModule {}

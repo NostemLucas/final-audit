@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator'
 import { PaginationDto } from '@core/dtos'
 import { UserStatus, Role } from '../entities/user.entity'
-import { Type, Transform } from 'class-transformer'
+import { Transform } from 'class-transformer'
 
 /**
  * DTO para buscar usuarios con filtros específicos

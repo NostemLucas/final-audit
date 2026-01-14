@@ -273,7 +273,8 @@ export function IsEmail(
   const finalOptions: validator.ValidationOptions = {
     ...restOptions,
     message:
-      restOptions.message || createMessage(ValidationMessageEnum.IS_EMAIL, fieldName),
+      restOptions.message ||
+      createMessage(ValidationMessageEnum.IS_EMAIL, fieldName),
   }
 
   return validator.IsEmail(options, finalOptions)

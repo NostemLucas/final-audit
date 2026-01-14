@@ -16,11 +16,16 @@ export class LoggerService implements NestLoggerService {
   public readonly database: TypeOrmDatabaseLogger
   public readonly startup: StartupLogger
 
-  constructor() {
-    this.http = new HttpLogger()
-    this.exception = new ExceptionLogger()
-    this.database = new TypeOrmDatabaseLogger()
-    this.startup = new StartupLogger()
+  constructor(
+    httpLogger: HttpLogger,
+    exceptionLogger: ExceptionLogger,
+    databaseLogger: TypeOrmDatabaseLogger,
+    startupLogger: StartupLogger,
+  ) {
+    this.http = httpLogger
+    this.exception = exceptionLogger
+    this.database = databaseLogger
+    this.startup = startupLogger
   }
 
   // ===== NESTJS LOGGER SERVICE INTERFACE =====

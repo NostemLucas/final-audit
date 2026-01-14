@@ -69,6 +69,7 @@ export class UsersRepository
     })
   }
 
+  // Validaciones de unicidad
   async existsByEmail(email: string, excludeId?: string): Promise<boolean> {
     const query = this.getRepo()
       .createQueryBuilder('user')

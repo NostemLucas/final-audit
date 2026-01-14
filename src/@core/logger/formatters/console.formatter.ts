@@ -1,5 +1,6 @@
 import * as winston from 'winston'
 import chalk from 'chalk'
+import { formatJSON } from '../utils'
 
 interface LogInfo {
   timestamp?: string
@@ -65,20 +66,10 @@ const LOG_COLORS = {
   silly: chalk.gray,
 }
 
-// Función para formatear JSON de manera más compacta y legible
-function formatJSON(obj: unknown, indent = 2): string {
-  if (typeof obj !== 'object' || obj === null) {
-    return String(obj)
-  }
-
-  const json = JSON.stringify(obj, null, indent)
-  return json
-    .split('\n')
-    .map((line, index) => (index === 0 ? line : ' '.repeat(indent) + line))
-    .join('\n')
-}
-
-// Función para formatear queries SQL de manera visual
+/**
+ * Formatea un bloque SQL para logs de consola
+ * Solo aplica colores, asume que la query ya viene formateada por TypeORM
+ */
 function formatSQLBlock(query: string, level: string): string {
   const colorFn = LOG_COLORS[level as keyof typeof LOG_COLORS] || chalk.white
   const lines = query.split('\n')
@@ -86,22 +77,12 @@ function formatSQLBlock(query: string, level: string): string {
   // Separador visual
   const separator = colorFn('─'.repeat(80))
 
-  // Formatear línea por línea
-  const formattedLines = lines.map((line) => {
-    // Resaltar palabras clave SQL
-    const highlighted = line
-      .replace(
-        /\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|ORDER BY|GROUP BY|HAVING|LIMIT|OFFSET|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TABLE|INDEX|AS|DISTINCT|COUNT|SUM|AVG|MAX|MIN|CASE|WHEN|THEN|ELSE|END)\b/g,
-        (match) => chalk.bold.white(match),
-      )
-      .replace(/--.*$/g, (match) => chalk.gray.italic(match)) // Comentarios en gris
-      .replace(/'([^']*)'/g, (match) => chalk.green(match)) // Strings en verde
-      .replace(/\b(\d+)\b/g, (match) => chalk.cyan(match)) // Números en cyan
-
-    return `  ${colorFn('│')} ${highlighted}`
+  // Solo colorear las líneas sin modificar la estructura
+  const coloredLines = lines.map((line) => {
+    return `  ${colorFn('│')} ${chalk.gray(line)}`
   })
 
-  return `\n${separator}\n${formattedLines.join('\n')}\n${separator}`
+  return `\n${separator}\n${coloredLines.join('\n')}\n${separator}`
 }
 
 export const consoleFormatter = winston.format.printf((info) => {
@@ -123,6 +104,7 @@ export const consoleFormatter = winston.format.printf((info) => {
   } = logInfo
 
   // Obtener nivel sin colores ANSI
+  // eslint-disable-next-line no-control-regex
   const cleanLevel = (level ?? '').replace(/\u001b\[\d+m/g, '').toLowerCase()
   const colorFn =
     LOG_COLORS[cleanLevel as keyof typeof LOG_COLORS] || chalk.white
@@ -132,7 +114,10 @@ export const consoleFormatter = winston.format.printf((info) => {
   const ts = chalk.gray(timestamp ?? '')
 
   // Service/Context en gris claro
-  const ctx = service ? chalk.gray(`[${service}]`) : ''
+  const ctx =
+    service && (typeof service === 'string' || typeof service === 'number')
+      ? chalk.gray(`[${String(service)}]`)
+      : ''
 
   // Símbolo y nivel coloreados
   const levelDisplay = colorFn(`${symbol} ${cleanLevel.toUpperCase()}`)
@@ -275,10 +260,12 @@ export const consoleFormatter = winston.format.printf((info) => {
     const formattedData = Object.entries(additionalData)
       .map(([key, value]) => {
         const keyDisplay = chalk.bold(key)
-        const valueDisplay =
-          typeof value === 'object'
-            ? formatJSON(value, 4)
-            : chalk.cyan(String(value))
+        let valueDisplay: string
+        if (typeof value === 'object' && value !== null) {
+          valueDisplay = formatJSON(value, 4)
+        } else {
+          valueDisplay = chalk.cyan(String(value))
+        }
         return `  │ ${keyDisplay}: ${valueDisplay}`
       })
       .join('\n')

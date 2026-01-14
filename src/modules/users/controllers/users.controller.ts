@@ -21,16 +21,38 @@ import {
   ApiStandardResponses,
 } from '@core/swagger'
 
-import { UsersService } from '../services/users.service'
+import {
+  CreateUserUseCase,
+  UpdateUserUseCase,
+  FindAllUsersUseCase,
+  FindUserByIdUseCase,
+  FindUsersByOrganizationUseCase,
+  UploadProfileImageUseCase,
+  DeactivateUserUseCase,
+  RemoveUserUseCase,
+  ActivateUserUseCase,
+} from '../use-cases'
 import { CreateUserDto, UpdateUserDto } from '../dtos'
 import { UserEntity } from '../entities/user.entity'
 import { UploadAvatar } from '@core/files'
+import { Public } from 'src/modules/auth'
 
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly createUserUseCase: CreateUserUseCase,
+    private readonly updateUserUseCase: UpdateUserUseCase,
+    private readonly findAllUsersUseCase: FindAllUsersUseCase,
+    private readonly findUserByIdUseCase: FindUserByIdUseCase,
+    private readonly findUsersByOrganizationUseCase: FindUsersByOrganizationUseCase,
+    private readonly uploadProfileImageUseCase: UploadProfileImageUseCase,
+    private readonly deactivateUserUseCase: DeactivateUserUseCase,
+    private readonly removeUserUseCase: RemoveUserUseCase,
+    private readonly activateUserUseCase: ActivateUserUseCase,
+  ) {}
 
+  @Public()
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
@@ -43,14 +65,14 @@ export class UsersController {
     'Ya existe un usuario con ese email, username o CI',
   )
   async create(@Body() createUserDto: CreateUserDto) {
-    return await this.usersService.create(createUserDto)
+    return await this.createUserUseCase.execute(createUserDto)
   }
 
   @Get()
   @ApiOperation({ summary: 'Listar todos los usuarios' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios' })
   async findAll() {
-    return await this.usersService.findAll()
+    return await this.findAllUsersUseCase.execute()
   }
 
   @Get(':id')
@@ -58,7 +80,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Usuario encontrado' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async findOne(@Param('id') id: string) {
-    return await this.usersService.findOne(id)
+    return await this.findUserByIdUseCase.execute(id)
   }
 
   @Get('organization/:organizationId')
@@ -68,7 +90,7 @@ export class UsersController {
     description: 'Lista de usuarios de la organización',
   })
   async findByOrganization(@Param('organizationId') organizationId: string) {
-    return await this.usersService.findByOrganization(organizationId)
+    return await this.findUsersByOrganizationUseCase.execute(organizationId)
   }
 
   @Patch(':id')
@@ -84,7 +106,7 @@ export class UsersController {
     description: 'Email, username o CI ya están en uso',
   })
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return await this.usersService.update(id, updateUserDto)
+    return await this.updateUserUseCase.execute(id, updateUserDto)
   }
 
   @Post(':id/upload-image')
@@ -107,7 +129,7 @@ export class UsersController {
     if (!file) {
       throw new BadRequestException('Debe proporcionar un archivo de imagen')
     }
-    return await this.usersService.uploadProfileImage(id, file)
+    return await this.uploadProfileImageUseCase.execute(id, file)
   }
 
   @Patch(':id/deactivate')
@@ -119,7 +141,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Usuario desactivado exitosamente' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async deactivate(@Param('id') id: string) {
-    return await this.usersService.deactivate(id)
+    return await this.deactivateUserUseCase.execute(id)
   }
 
   @Patch(':id/activate')
@@ -131,7 +153,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Usuario desactivado exitosamente' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async activate(@Param('id') id: string) {
-    return await this.usersService.activate(id)
+    return await this.activateUserUseCase.execute(id)
   }
 
   @Delete(':id')
@@ -147,6 +169,6 @@ export class UsersController {
   })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async remove(@Param('id') id: string) {
-    await this.usersService.remove(id)
+    await this.removeUserUseCase.execute(id)
   }
 }
