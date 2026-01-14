@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { TokenStorageService, REDIS_PREFIXES } from '@core/cache'
+import { RateLimitService } from '@core/security'
 import { JwtTokenHelper } from '../helpers'
+import { TooManyAttemptsException } from '../exceptions'
 
 export interface ResetPasswordPayload {
   sub: string // userId
@@ -32,11 +34,15 @@ export interface ResetPasswordPayload {
 export class ResetPasswordTokenService {
   private readonly tokenExpiry: string
   private readonly jwtSecret: string
+  private readonly maxAttemptsByIp = 10 // Máximo 10 intentos por IP
+  private readonly maxAttemptsByEmail = 5 // Máximo 5 intentos por email
+  private readonly attemptsWindow = 60 // Ventana de 60 minutos
 
   constructor(
     private readonly tokenStorage: TokenStorageService,
     private readonly jwtTokenHelper: JwtTokenHelper,
     private readonly configService: ConfigService,
+    private readonly rateLimitService: RateLimitService,
   ) {
     this.tokenExpiry = configService.get(
       'RESET_PASSWORD_TOKEN_EXPIRES_IN',
@@ -79,47 +85,93 @@ export class ResetPasswordTokenService {
   }
 
   /**
-   * Valida un token de reset password
+   * Valida un token de reset password CON RATE LIMITING
    *
-   * Flujo de validación híbrido:
-   * 1. Verifica la firma del JWT (criptográficamente seguro)
-   * 2. Verifica que el JWT no haya expirado
-   * 3. Extrae el userId y tokenId del JWT
-   * 4. Verifica que el tokenId existe en Redis (no ha sido revocado)
-   * 5. Si todo es válido, devuelve el userId
+   * Flujo de validación híbrido con protección contra fuerza bruta:
+   * 1. Verifica rate limiting por IP (10 intentos en 60 min)
+   * 2. Verifica la firma del JWT (criptográficamente seguro)
+   * 3. Verifica que el JWT no haya expirado
+   * 4. Extrae el userId y tokenId del JWT
+   * 5. Verifica que el tokenId existe en Redis (no ha sido revocado)
+   * 6. Si es válido, resetea intentos; si no, incrementa contador
    *
-   * Esto garantiza que:
+   * Esto garantiza:
+   * - Protección contra fuerza bruta (rate limiting)
    * - El token no ha sido adulterado (firma JWT)
    * - El token no ha expirado (exp del JWT)
    * - El token no ha sido revocado (existe en Redis)
    * - El token no ha sido usado (se elimina de Redis después del primer uso)
    *
    * @param token - Token JWT a validar
+   * @param ip - Dirección IP del usuario (para rate limiting)
    * @returns userId si el token es válido, null si no
+   * @throws TooManyAttemptsException si excede intentos
    */
-  async validateToken(token: string): Promise<string | null> {
+  async validateToken(token: string, ip: string): Promise<string | null> {
+    // 1. Verificar rate limiting por IP
+    const rateLimitKeyIp = `reset-password:attempts:ip:${ip}`
+    const canAttemptByIp = await this.rateLimitService.checkLimit(
+      rateLimitKeyIp,
+      this.maxAttemptsByIp,
+      this.attemptsWindow,
+    )
+
+    if (!canAttemptByIp) {
+      const remaining =
+        await this.rateLimitService.getTimeUntilReset(rateLimitKeyIp)
+      throw new TooManyAttemptsException(
+        `Demasiados intentos desde esta IP. Intenta de nuevo en ${Math.ceil(remaining / 60)} minutos.`,
+      )
+    }
+
     try {
-      // 1. Verificar JWT (firma y expiración)
+      // 2. Verificar JWT (firma y expiración)
       const payload = this.jwtTokenHelper.verifyToken<ResetPasswordPayload>(
         token,
         this.jwtSecret,
       )
-      if (!payload) return null
 
-      // 2. Verificar que es un token de reset password
-      if (!this.jwtTokenHelper.validateTokenType(payload, 'reset-password')) {
+      if (!payload) {
+        await this.rateLimitService.incrementAttempts(
+          rateLimitKeyIp,
+          this.attemptsWindow,
+        )
         return null
       }
 
-      // 3. Verificar que el token existe en Redis (no revocado)
+      // 3. Verificar que es un token de reset password
+      if (!this.jwtTokenHelper.validateTokenType(payload, 'reset-password')) {
+        await this.rateLimitService.incrementAttempts(
+          rateLimitKeyIp,
+          this.attemptsWindow,
+        )
+        return null
+      }
+
+      // 4. Verificar que el token existe en Redis (no revocado)
       const existsInRedis = await this.tokenStorage.validateToken(
         payload.sub,
         payload.tokenId,
         REDIS_PREFIXES.RESET_PASSWORD,
       )
 
-      return existsInRedis ? payload.sub : null
+      if (!existsInRedis) {
+        await this.rateLimitService.incrementAttempts(
+          rateLimitKeyIp,
+          this.attemptsWindow,
+        )
+        return null
+      }
+
+      // 5. Token válido - resetear intentos
+      await this.rateLimitService.resetAttempts(rateLimitKeyIp)
+
+      return payload.sub
     } catch {
+      await this.rateLimitService.incrementAttempts(
+        rateLimitKeyIp,
+        this.attemptsWindow,
+      )
       return null
     }
   }

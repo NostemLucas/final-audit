@@ -1,6 +1,7 @@
 import { UserFactory } from './user.factory'
 import { CreateUserDto, UpdateUserDto } from '../dtos'
 import { UserEntity, UserStatus, Role } from '../entities/user.entity'
+import { PasswordHashService } from '@core/security'
 import * as bcrypt from 'bcrypt'
 
 /**
@@ -8,18 +9,20 @@ import * as bcrypt from 'bcrypt'
  *
  * UserFactory tiene lógica de:
  * - Normalización (email/username a lowercase)
- * - Hashing de passwords (bcrypt)
+ * - Hashing de passwords (via PasswordHashService)
  * - Defaults (status, image)
  *
- * NO necesita mocks porque:
+ * Usa PasswordHashService real (no mock) porque:
  * - bcrypt es una función pura (mismo input → mismo output verificable)
  * - No tiene dependencias de I/O (DB, network, filesystem)
  */
 describe('UserFactory', () => {
   let factory: UserFactory
+  let passwordHashService: PasswordHashService
 
   beforeEach(() => {
-    factory = new UserFactory() // ✅ Instancia real, sin mocks
+    passwordHashService = new PasswordHashService() // ✅ Instancia real
+    factory = new UserFactory(passwordHashService) // ✅ Inyectar servicio
   })
 
   describe('createFromDto', () => {
@@ -37,9 +40,9 @@ describe('UserFactory', () => {
       status: UserStatus.ACTIVE,
     }
 
-    it('should create user entity with all fields', () => {
+    it('should create user entity with all fields', async () => {
       // Act
-      const result = factory.createFromDto(baseDto)
+      const result = await factory.createFromDto(baseDto)
 
       // Assert
       expect(result).toBeInstanceOf(UserEntity)
@@ -54,7 +57,7 @@ describe('UserFactory', () => {
       expect(result.image).toBeNull() // ✅ Default value
     })
 
-    it('should normalize email to lowercase', () => {
+    it('should normalize email to lowercase', async () => {
       // Arrange
       const dto: CreateUserDto = {
         ...baseDto,
@@ -62,13 +65,13 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.email).toBe('juan@test.com')
     })
 
-    it('should normalize username to lowercase', () => {
+    it('should normalize username to lowercase', async () => {
       // Arrange
       const dto: CreateUserDto = {
         ...baseDto,
@@ -76,13 +79,13 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.username).toBe('juanperez')
     })
 
-    it('should hash password using bcrypt', () => {
+    it('should hash password using bcrypt', async () => {
       // Arrange
       const dto: CreateUserDto = {
         ...baseDto,
@@ -90,7 +93,7 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       // ✅ Password debe estar hasheado (no debe ser el original)
@@ -103,14 +106,14 @@ describe('UserFactory', () => {
       expect(isValid).toBe(true)
     })
 
-    it('should generate different hashes for same password (bcrypt salt)', () => {
+    it('should generate different hashes for same password (bcrypt salt)', async () => {
       // Arrange
       const dto1: CreateUserDto = { ...baseDto, password: 'SamePassword' }
       const dto2: CreateUserDto = { ...baseDto, password: 'SamePassword' }
 
       // Act
-      const user1 = factory.createFromDto(dto1)
-      const user2 = factory.createFromDto(dto2)
+      const user1 = await factory.createFromDto(dto1)
+      const user2 = await factory.createFromDto(dto2)
 
       // Assert
       // ✅ bcrypt usa salt, así que hashes deben ser diferentes
@@ -121,7 +124,7 @@ describe('UserFactory', () => {
       expect(bcrypt.compareSync('SamePassword', user2.password)).toBe(true)
     })
 
-    it('should set default status to ACTIVE when not provided', () => {
+    it('should set default status to ACTIVE when not provided', async () => {
       // Arrange
       const dto: CreateUserDto = {
         ...baseDto,
@@ -129,13 +132,13 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.status).toBe(UserStatus.ACTIVE)
     })
 
-    it('should respect provided status', () => {
+    it('should respect provided status', async () => {
       // Arrange
       const dto: CreateUserDto = {
         ...baseDto,
@@ -143,13 +146,13 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.status).toBe(UserStatus.INACTIVE)
     })
 
-    it('should handle optional fields as null', () => {
+    it('should handle optional fields as null', async () => {
       // Arrange
       const dto: CreateUserDto = {
         names: 'Test',
@@ -166,7 +169,7 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.phone).toBeNull()
@@ -174,7 +177,7 @@ describe('UserFactory', () => {
       expect(result.image).toBeNull()
     })
 
-    it('should handle multiple roles', () => {
+    it('should handle multiple roles', async () => {
       // Arrange
       const dto: CreateUserDto = {
         ...baseDto,
@@ -182,14 +185,14 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.roles).toEqual([Role.ADMIN, Role.GERENTE, Role.AUDITOR])
       expect(result.roles.length).toBe(3)
     })
 
-    it('should handle email with mixed case and normalize', () => {
+    it('should handle email with mixed case and normalize', async () => {
       // Arrange
       const dto: CreateUserDto = {
         ...baseDto,
@@ -197,7 +200,7 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.email).toBe('juan.perez@test.com')
@@ -343,59 +346,62 @@ describe('UserFactory', () => {
     })
   })
 
-  describe('verifyPassword', () => {
-    it('should return true for correct password', () => {
+  describe('verifyPassword (via PasswordHashService)', () => {
+    it('should return true for correct password', async () => {
       // Arrange
       const plainPassword = 'MySecurePassword123!'
-      const hash = bcrypt.hashSync(plainPassword, 10)
+      const hash = await passwordHashService.hash(plainPassword)
 
       // Act
-      const result = factory.verifyPassword(plainPassword, hash)
+      const result = await passwordHashService.verify(plainPassword, hash)
 
       // Assert
       expect(result).toBe(true)
     })
 
-    it('should return false for incorrect password', () => {
+    it('should return false for incorrect password', async () => {
       // Arrange
       const plainPassword = 'MySecurePassword123!'
       const wrongPassword = 'WrongPassword'
-      const hash = bcrypt.hashSync(plainPassword, 10)
+      const hash = await passwordHashService.hash(plainPassword)
 
       // Act
-      const result = factory.verifyPassword(wrongPassword, hash)
+      const result = await passwordHashService.verify(wrongPassword, hash)
 
       // Assert
       expect(result).toBe(false)
     })
 
-    it('should be case sensitive', () => {
+    it('should be case sensitive', async () => {
       // Arrange
       const plainPassword = 'Password123!'
-      const hash = bcrypt.hashSync(plainPassword, 10)
+      const hash = await passwordHashService.hash(plainPassword)
 
       // Act
-      const resultCorrect = factory.verifyPassword('Password123!', hash)
-      const resultWrong = factory.verifyPassword('password123!', hash) // lowercase
+      const resultCorrect = await passwordHashService.verify(
+        'Password123!',
+        hash,
+      )
+      const resultWrong = await passwordHashService.verify('password123!', hash) // lowercase
 
       // Assert
       expect(resultCorrect).toBe(true)
       expect(resultWrong).toBe(false)
     })
 
-    it('should handle special characters', () => {
+    it('should handle special characters', async () => {
       // Arrange
       const plainPassword = 'P@ssw0rd!#$%^&*()'
-      const hash = bcrypt.hashSync(plainPassword, 10)
+      const hash = await passwordHashService.hash(plainPassword)
 
       // Act
-      const result = factory.verifyPassword(plainPassword, hash)
+      const result = await passwordHashService.verify(plainPassword, hash)
 
       // Assert
       expect(result).toBe(true)
     })
 
-    it('should verify password created by createFromDto', () => {
+    it('should verify password created by createFromDto', async () => {
       // Arrange
       const dto: CreateUserDto = {
         names: 'Test',
@@ -410,8 +416,8 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const user = factory.createFromDto(dto)
-      const isValid = factory.verifyPassword(
+      const user = await factory.createFromDto(dto)
+      const isValid = await passwordHashService.verify(
         'MyPlainPassword123!',
         user.password,
       )
@@ -422,7 +428,7 @@ describe('UserFactory', () => {
   })
 
   describe('Edge Cases', () => {
-    it('should handle very long names', () => {
+    it('should handle very long names', async () => {
       // Arrange
       const longName = 'A'.repeat(100)
       const dto: CreateUserDto = {
@@ -438,13 +444,13 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.names).toBe(longName)
     })
 
-    it('should handle email with + symbol (valid email)', () => {
+    it('should handle email with + symbol (valid email)', async () => {
       // Arrange
       const dto: CreateUserDto = {
         names: 'Test',
@@ -459,13 +465,13 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.email).toBe('test+filter@test.com')
     })
 
-    it('should handle username with numbers', () => {
+    it('should handle username with numbers', async () => {
       // Arrange
       const dto: CreateUserDto = {
         names: 'Test',
@@ -480,13 +486,13 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.username).toBe('user123test')
     })
 
-    it('should handle empty roles array', () => {
+    it('should handle empty roles array', async () => {
       // Arrange
       const dto: CreateUserDto = {
         names: 'Test',
@@ -501,15 +507,15 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.roles).toEqual([])
     })
 
-    it('should handle all UserStatus values', () => {
+    it('should handle all UserStatus values', async () => {
       // Arrange & Act
-      const activeUser = factory.createFromDto({
+      const activeUser = await factory.createFromDto({
         names: 'Test',
         lastNames: 'User',
         email: 'test1@test.com',
@@ -521,7 +527,7 @@ describe('UserFactory', () => {
         status: UserStatus.ACTIVE,
       })
 
-      const inactiveUser = factory.createFromDto({
+      const inactiveUser = await factory.createFromDto({
         names: 'Test',
         lastNames: 'User',
         email: 'test2@test.com',
@@ -533,7 +539,7 @@ describe('UserFactory', () => {
         status: UserStatus.INACTIVE,
       })
 
-      const suspendedUser = factory.createFromDto({
+      const suspendedUser = await factory.createFromDto({
         names: 'Test',
         lastNames: 'User',
         email: 'test3@test.com',
@@ -551,7 +557,7 @@ describe('UserFactory', () => {
       expect(suspendedUser.status).toBe(UserStatus.SUSPENDED)
     })
 
-    it('should handle all Role values', () => {
+    it('should handle all Role values', async () => {
       // Arrange
       const dto: CreateUserDto = {
         names: 'Test',
@@ -566,7 +572,7 @@ describe('UserFactory', () => {
       }
 
       // Act
-      const result = factory.createFromDto(dto)
+      const result = await factory.createFromDto(dto)
 
       // Assert
       expect(result.roles).toContain(Role.ADMIN)

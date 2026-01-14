@@ -69,11 +69,17 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED,
     description: 'Credenciales inválidas o usuario inactivo',
   })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Demasiados intentos fallidos',
+  })
   async login(
     @Body() loginDto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<LoginResponseDto> {
-    const { response, refreshToken } = await this.authService.login(loginDto)
+    const ip = this.extractIp(req)
+    const { response, refreshToken } = await this.authService.login(loginDto, ip)
 
     // Configurar refresh token en HTTP-only cookie
     this.setRefreshTokenCookie(res, refreshToken)
@@ -229,6 +235,32 @@ export class AuthController {
     return type === 'Bearer' ? token : undefined
   }
 
+  /**
+   * Helper: Extrae la IP real del request (considera proxies)
+   *
+   * Prioridad:
+   * 1. X-Forwarded-For (si está detrás de un proxy/load balancer)
+   * 2. X-Real-IP (alternativa común)
+   * 3. req.ip (directo de Express)
+   */
+  private extractIp(req: Request): string {
+    const forwardedFor = req.headers['x-forwarded-for']
+    if (forwardedFor) {
+      // X-Forwarded-For puede ser una lista: "client, proxy1, proxy2"
+      const ips = Array.isArray(forwardedFor)
+        ? forwardedFor[0]
+        : forwardedFor.split(',')[0]
+      return ips.trim()
+    }
+
+    const realIp = req.headers['x-real-ip']
+    if (realIp && typeof realIp === 'string') {
+      return realIp.trim()
+    }
+
+    return req.ip || 'unknown'
+  }
+
   // ========================================
   // Reset Password Endpoints
   // ========================================
@@ -315,10 +347,16 @@ export class AuthController {
     status: HttpStatus.NOT_FOUND,
     description: 'Usuario no encontrado',
   })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Demasiados intentos desde esta IP',
+  })
   async resetPassword(
     @Body() dto: ResetPasswordDto,
+    @Req() req: Request,
   ): Promise<{ message: string }> {
-    return await this.authService.resetPassword(dto.token, dto.newPassword)
+    const ip = this.extractIp(req)
+    return await this.authService.resetPassword(dto.token, dto.newPassword, ip)
   }
 
   // ========================================

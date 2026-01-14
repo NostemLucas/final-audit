@@ -5,7 +5,6 @@ import { AppService } from './app.service'
 import { EmailModule } from '@core/email/email.module'
 import { DatabaseModule } from '@core/database'
 import { SecurityModule } from '@core/security'
-import { AuthorizationModule as RbacAuthorizationModule } from '@core/authorization'
 import { APP_INTERCEPTOR, APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { LoggerModule } from '@core/logger'
 import { HttpExceptionFilter } from '@core/filters'
@@ -34,7 +33,6 @@ import { AuthorizationModule, PermissionsGuard } from './modules/authorization'
     EmailModule,
     PersistenceModule,
     SecurityModule, // Password hashing
-    RbacAuthorizationModule, // RBAC (Role-Based Access Control)
 
     // Authentication & Authorization
     AuthModule, // Guards: JwtAuthGuard, RolesGuard

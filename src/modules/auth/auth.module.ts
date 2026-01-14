@@ -24,7 +24,6 @@ import {
 } from './use-cases'
 import { LocalStrategy, JwtStrategy, JwtRefreshStrategy } from './strategies'
 import { JwtAuthGuard } from './guards'
-import { RolesGuard } from '@core/authorization'
 import { JwtTokenHelper } from './helpers'
 
 @Module({
@@ -108,18 +107,12 @@ import { JwtTokenHelper } from './helpers'
     // Guards
     // ========================================
     JwtAuthGuard, // Guard de autenticación JWT (local al módulo auth)
-    RolesGuard, // Guard de autorización (importado desde @core/authorization)
-
     // ========================================
     // Global Guards (registrados como APP_GUARD)
     // ========================================
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard, // ✅ Protege TODAS las rutas por defecto (usar @Public() para excepciones)
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard, // ✅ Verifica roles cuando se usa @Roles()
     },
   ],
 
@@ -133,7 +126,6 @@ import { JwtTokenHelper } from './helpers'
     TwoFactorTokenService,
     // Exportar guards para uso manual si es necesario
     JwtAuthGuard,
-    RolesGuard,
   ],
 })
 export class AuthModule {}

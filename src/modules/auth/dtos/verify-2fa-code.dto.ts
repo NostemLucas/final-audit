@@ -16,13 +16,15 @@ import { TWO_FACTOR_CONSTRAINTS } from '../constants'
  * El usuario proporciona:
  * 1. userId - ID del usuario que recibió el código
  * 2. code - Código numérico recibido por email
- * 3. token - Token JWT opcional para validación adicional
+ * 3. token - Token JWT REQUERIDO (vincula sesión con código)
  *
  * El sistema valida:
- * 1. JWT (si se proporciona)
+ * 1. JWT (firma y expiración) - OBLIGATORIO
  * 2. Código existe en Redis y no ha expirado
- * 3. Código coincide con el userId
+ * 3. Código coincide con el tokenId del JWT
  * 4. Elimina el código de Redis (un solo uso)
+ *
+ * SEGURIDAD: El token es obligatorio para prevenir ataques sin sesión
  */
 export class Verify2FACodeDto {
   @ApiProperty({
@@ -52,15 +54,15 @@ export class Verify2FACodeDto {
   code: string
 
   @ApiProperty({
-    description: 'Token JWT opcional para validación adicional',
+    description: 'Token JWT requerido para validación (vincula sesión con código)',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-    required: false,
+    required: true,
     minLength: TWO_FACTOR_CONSTRAINTS.TOKEN.MIN,
     maxLength: TWO_FACTOR_CONSTRAINTS.TOKEN.MAX,
   })
-  @IsOptional()
   @IsString({ message: 'El token debe ser una cadena de texto' })
+  @IsNotEmpty({ message: 'El token es requerido' })
   @MinLength(TWO_FACTOR_CONSTRAINTS.TOKEN.MIN)
   @MaxLength(TWO_FACTOR_CONSTRAINTS.TOKEN.MAX)
-  token?: string
+  token: string
 }

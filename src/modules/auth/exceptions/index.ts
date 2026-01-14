@@ -4,3 +4,4 @@
 export * from './invalid-credentials.exception'
 export * from './invalid-token.exception'
 export * from './user-not-active.exception'
+export * from './too-many-attempts.exception'

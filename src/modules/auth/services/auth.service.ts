@@ -41,15 +41,18 @@ export class AuthService {
   ) {}
 
   /**
-   * Autenticar usuario con credenciales
+   * Autenticar usuario con credenciales CON RATE LIMITING
    *
    * @param dto - Credenciales de login (usernameOrEmail + password)
+   * @param ip - Dirección IP del usuario (para rate limiting)
    * @returns Token de acceso, información del usuario y refresh token
+   * @throws TooManyAttemptsException si excede intentos
    */
   async login(
     dto: LoginDto,
+    ip: string,
   ): Promise<{ response: LoginResponseDto; refreshToken: string }> {
-    return await this.loginUseCase.execute(dto)
+    return await this.loginUseCase.execute(dto, ip)
   }
 
   /**
@@ -96,19 +99,22 @@ export class AuthService {
   }
 
   /**
-   * Resetear contraseña usando token
+   * Resetear contraseña usando token CON RATE LIMITING
    *
    * Delega al use case correspondiente
    *
    * @param token - Token de reset
    * @param newPassword - Nueva contraseña
+   * @param ip - Dirección IP del usuario (para rate limiting)
    * @returns Mensaje de confirmación
+   * @throws TooManyAttemptsException si excede intentos por IP
    */
   async resetPassword(
     token: string,
     newPassword: string,
+    ip: string,
   ): Promise<{ message: string }> {
-    return await this.resetPasswordUseCase.execute(token, newPassword)
+    return await this.resetPasswordUseCase.execute(token, newPassword, ip)
   }
 
   // ========================================
@@ -136,13 +142,14 @@ export class AuthService {
    *
    * @param userId - ID del usuario
    * @param code - Código numérico
-   * @param token - Token JWT opcional
+   * @param token - Token JWT OBLIGATORIO (vincula sesión con código)
    * @returns Resultado de la validación
+   * @throws TooManyAttemptsException si se exceden intentos
    */
   async verify2FACode(
     userId: string,
     code: string,
-    token?: string,
+    token: string,
   ): Promise<{ valid: boolean; message: string }> {
     return await this.verify2FACodeUseCase.execute(userId, code, token)
   }
