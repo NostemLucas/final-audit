@@ -20,6 +20,7 @@ import { AuthModule } from './modules/auth'
 import { AuthorizationModule, PermissionsGuard } from './modules/authorization'
 import { TemplatesModule } from './modules/templates'
 import { MaturityModule } from './modules/maturity'
+import { AuditsModule } from './modules/audits/audits.module'
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { MaturityModule } from './modules/maturity'
     UsersModule,
     TemplatesModule,
     MaturityModule,
+    AuditsModule,
   ],
   controllers: [AppController],
   providers: [

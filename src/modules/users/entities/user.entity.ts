@@ -65,9 +65,16 @@ export class UserEntity extends BaseEntity {
   @Column({
     type: 'enum',
     enum: UserStatus,
-    default: UserStatus.ACTIVE,
+    default: UserStatus.INACTIVE, // Inactivo hasta que verifique email
   })
   status: UserStatus
+
+  // Verificación de email
+  @Column({ type: 'boolean', default: false })
+  emailVerified: boolean
+
+  @Column({ type: 'timestamp', nullable: true })
+  emailVerifiedAt: Date | null
 
   @Column({ type: 'uuid', nullable: false })
   organizationId: string
@@ -83,7 +90,6 @@ export class UserEntity extends BaseEntity {
   })
   roles: Role[]
 
-  // Computed properties
   get fullName(): string {
     return `${this.names} ${this.lastNames}`
   }

@@ -9,9 +9,11 @@ import {
   FindUserByIdUseCase,
   FindUsersByOrganizationUseCase,
   UploadProfileImageUseCase,
+  DeleteProfileImageUseCase,
   DeactivateUserUseCase,
   RemoveUserUseCase,
   ActivateUserUseCase,
+  VerifyEmailUseCase,
 } from './use-cases'
 
 @Module({
@@ -25,9 +27,11 @@ import {
     FindUserByIdUseCase,
     FindUsersByOrganizationUseCase,
     UploadProfileImageUseCase,
+    DeleteProfileImageUseCase,
     DeactivateUserUseCase,
     RemoveUserUseCase,
     ActivateUserUseCase,
+    VerifyEmailUseCase,
     // Infrastructure
     UserValidator,
     UserFactory,

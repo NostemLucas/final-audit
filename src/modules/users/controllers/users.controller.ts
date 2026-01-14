@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   HttpCode,
   HttpStatus,
   UploadedFile,
@@ -26,16 +27,18 @@ import {
   UpdateUserUseCase,
   FindAllUsersUseCase,
   FindUserByIdUseCase,
-  FindUsersByOrganizationUseCase,
   UploadProfileImageUseCase,
+  DeleteProfileImageUseCase,
   DeactivateUserUseCase,
   RemoveUserUseCase,
   ActivateUserUseCase,
+  VerifyEmailUseCase,
 } from '../use-cases'
 import { CreateUserDto, UpdateUserDto } from '../dtos'
 import { UserEntity } from '../entities/user.entity'
 import { UploadAvatar } from '@core/files'
 import { Public } from '../../auth'
+import { FindUsersDto } from '../dtos/find-users.dto'
 
 @ApiTags('users')
 @Controller('users')
@@ -45,11 +48,12 @@ export class UsersController {
     private readonly updateUserUseCase: UpdateUserUseCase,
     private readonly findAllUsersUseCase: FindAllUsersUseCase,
     private readonly findUserByIdUseCase: FindUserByIdUseCase,
-    private readonly findUsersByOrganizationUseCase: FindUsersByOrganizationUseCase,
     private readonly uploadProfileImageUseCase: UploadProfileImageUseCase,
-    private readonly deactivateUserUseCase: DeactivateUserUseCase,
+    private readonly deleteProfileImageUseCase: DeleteProfileImageUseCase,
     private readonly removeUserUseCase: RemoveUserUseCase,
     private readonly activateUserUseCase: ActivateUserUseCase,
+    private readonly deactivateUserUseCase: DeactivateUserUseCase,
+    private readonly verifyEmailUseCase: VerifyEmailUseCase,
   ) {}
 
   @Public()
@@ -71,8 +75,8 @@ export class UsersController {
   @Get()
   @ApiOperation({ summary: 'Listar todos los usuarios' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios' })
-  async findAll() {
-    return await this.findAllUsersUseCase.execute()
+  async findAll(findUsersDto: FindUsersDto) {
+    return await this.findAllUsersUseCase.execute(findUsersDto)
   }
 
   @Get(':id')
@@ -81,16 +85,6 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async findOne(@Param('id') id: string) {
     return await this.findUserByIdUseCase.execute(id)
-  }
-
-  @Get('organization/:organizationId')
-  @ApiOperation({ summary: 'Listar usuarios por organización' })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de usuarios de la organización',
-  })
-  async findByOrganization(@Param('organizationId') organizationId: string) {
-    return await this.findUsersByOrganizationUseCase.execute(organizationId)
   }
 
   @Patch(':id')
@@ -132,6 +126,19 @@ export class UsersController {
     return await this.uploadProfileImageUseCase.execute(id, file)
   }
 
+  @Delete(':id/image')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Eliminar imagen de perfil del usuario',
+    description:
+      'Elimina la imagen de perfil del usuario y la remueve del storage.',
+  })
+  @ApiResponse({ status: 200, description: 'Imagen eliminada exitosamente' })
+  @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
+  async deleteProfileImage(@Param('id') id: string) {
+    return await this.deleteProfileImageUseCase.execute(id)
+  }
+
   @Patch(':id/deactivate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -154,6 +161,29 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async activate(@Param('id') id: string) {
     return await this.activateUserUseCase.execute(id)
+  }
+
+  @Public()
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verificar email de usuario',
+    description:
+      'Verifica el email del usuario usando el token enviado por correo. Marca el email como verificado y activa la cuenta.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Email verificado exitosamente y cuenta activada',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Token inválido o expirado',
+  })
+  async verifyEmail(@Query('token') token: string) {
+    if (!token) {
+      throw new BadRequestException('Token de verificación requerido')
+    }
+    return await this.verifyEmailUseCase.execute(token)
   }
 
   @Delete(':id')

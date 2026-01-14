@@ -2,6 +2,7 @@ import { Injectable, Inject } from '@nestjs/common'
 import { UserEntity } from '../../entities/user.entity'
 import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
+import { FindUsersDto } from '../../dtos/find-users.dto'
 
 /**
  * Caso de uso: Obtener todos los usuarios
@@ -13,7 +14,7 @@ export class FindAllUsersUseCase {
     private readonly usersRepository: IUsersRepository,
   ) {}
 
-  async execute(): Promise<UserEntity[]> {
+  async execute(findUsersDto: FindUsersDto): Promise<UserEntity[]> {
     return await this.usersRepository.findAll()
   }
 }
