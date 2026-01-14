@@ -5,12 +5,12 @@
 
 import { TypeOrmDatabaseLogger } from './loggers/typeorm-database.logger'
 import { BaseLogger } from './loggers/base.logger'
+import { WinstonProvider } from './providers'
 
-// Crear una instancia del logger de base de datos
-const dbLogger = new TypeOrmDatabaseLogger()
-
-// Crear una instancia del logger base
-const logger = new BaseLogger('example')
+// Crear provider y loggers
+const winstonProvider = new WinstonProvider()
+const dbLogger = new TypeOrmDatabaseLogger(winstonProvider)
+const logger = new BaseLogger(winstonProvider.getLogger(), 'example')
 
 console.log('\n========== Ejemplos de Logger Mejorado ==========\n')
 

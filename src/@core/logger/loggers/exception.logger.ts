@@ -8,11 +8,12 @@ import {
   LogLevel,
 } from '../types'
 import { IpExtractor } from '../utils'
+import { WinstonProvider } from '../providers'
 
 @Injectable()
 export class ExceptionLogger extends BaseLogger {
-  constructor() {
-    super('exception')
+  constructor(winstonProvider: WinstonProvider) {
+    super(winstonProvider.getLogger(), 'exception')
   }
 
   logException(

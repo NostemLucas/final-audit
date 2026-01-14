@@ -27,7 +27,7 @@ function getTypeORMConfigForCLI(): DataSourceOptions & SeederOptions {
     type: 'postgres',
     synchronize: false,
     logging: process.env.NODE_ENV === 'development',
-    logger: new TypeOrmDatabaseLogger(),
+    logger: TypeOrmDatabaseLogger.createStandalone(),
     maxQueryExecutionTime: 1000,
     entities: [`${projectRoot}/src/**/*.entity.ts`],
     migrations: [`${projectRoot}/src/@core/database/migrations/*{.ts,.js}`],

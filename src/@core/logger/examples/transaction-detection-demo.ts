@@ -31,7 +31,7 @@ class MockQueryRunner {
 }
 
 // Crear instancias
-const logger = new TypeOrmDatabaseLogger()
+const logger = TypeOrmDatabaseLogger.createStandalone()
 const queryRunner = new MockQueryRunner() as any
 
 console.log('========================================')
@@ -45,10 +45,10 @@ console.log('📝 ESCENARIO 1: Queries normales (sin transacción)\n')
 
 logger.logQuery('SELECT * FROM users WHERE id = $1', [123])
 
-logger.logQuery(
-  'SELECT * FROM orders WHERE user_id = $1 AND status = $2',
-  [123, 'pending'],
-)
+logger.logQuery('SELECT * FROM orders WHERE user_id = $1 AND status = $2', [
+  123,
+  'pending',
+])
 
 // ============================================
 // ESCENARIO 2: Queries DENTRO de transacción

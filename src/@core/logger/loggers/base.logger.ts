@@ -1,79 +1,21 @@
 import * as winston from 'winston'
-import DailyRotateFile from 'winston-daily-rotate-file'
 import { LogLevel, BaseLogContext } from '../types'
-import { colorFormatter, consoleFormatter, fileFormatter } from '../formatters'
 
+/**
+ * BaseLogger - Clase base para todos los loggers especializados
+ *
+ * MEJORA:
+ * Ahora recibe la instancia de Winston compartida en lugar de crear la suya propia.
+ * Esto reduce el consumo de memoria y file handles abiertos.
+ */
 export class BaseLogger {
   protected logger: winston.Logger
 
-  constructor(private readonly loggerName: string) {
-    this.logger = this.createLogger()
-  }
-
-  private createLogger(): winston.Logger {
-    // Definir niveles personalizados para winston
-    const customLevels = {
-      levels: {
-        error: 0,
-        warn: 1,
-        info: 2,
-        http: 3,
-        verbose: 4,
-        debug: 5,
-        silly: 6,
-      },
-    }
-
-    return winston.createLogger({
-      levels: customLevels.levels,
-      level: process.env.LOG_LEVEL || LogLevel.HTTP, // Cambiar default a HTTP para ver requests
-      defaultMeta: { service: this.loggerName },
-      transports: [
-        this.createConsoleTransport(),
-        this.createErrorFileTransport(),
-        this.createCombinedFileTransport(),
-      ],
-    })
-  }
-
-  private createConsoleTransport(): winston.transports.ConsoleTransportInstance {
-    return new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.timestamp({ format: 'HH:mm:ss' }),
-        winston.format.errors({ stack: true }),
-        colorFormatter,
-        consoleFormatter,
-      ),
-    })
-  }
-
-  private createErrorFileTransport(): DailyRotateFile {
-    return new DailyRotateFile({
-      filename: `logs/${this.loggerName}-error-%DATE%.log`,
-      datePattern: 'YYYY-MM-DD',
-      level: LogLevel.ERROR,
-      maxSize: '20m',
-      maxFiles: '30d',
-      format: winston.format.combine(
-        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        winston.format.errors({ stack: true }),
-        fileFormatter,
-      ),
-    })
-  }
-
-  private createCombinedFileTransport(): DailyRotateFile {
-    return new DailyRotateFile({
-      filename: `logs/${this.loggerName}-%DATE%.log`,
-      datePattern: 'YYYY-MM-DD',
-      maxSize: '20m',
-      maxFiles: '30d',
-      format: winston.format.combine(
-        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        winston.format.errors({ stack: true }),
-        fileFormatter,
-      ),
-    })
+  constructor(
+    logger: winston.Logger,
+    private readonly loggerName: string,
+  ) {
+    this.logger = logger
   }
 
   private internalLog(
@@ -83,6 +25,7 @@ export class BaseLogger {
   ): void {
     this.logger.log(level, message, {
       ...context,
+      service: this.loggerName, // Pasar el nombre del logger como metadata
       timestamp: new Date().toISOString(),
     })
   }

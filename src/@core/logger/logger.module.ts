@@ -6,10 +6,12 @@ import {
   TypeOrmDatabaseLogger,
   StartupLogger,
 } from './loggers'
+import { WinstonProvider } from './providers'
 
 @Global()
 @Module({
   providers: [
+    WinstonProvider, // ← Singleton que provee la instancia compartida de Winston
     LoggerService,
     HttpLogger,
     ExceptionLogger,
@@ -17,6 +19,7 @@ import {
     StartupLogger,
   ],
   exports: [
+    WinstonProvider,
     LoggerService,
     HttpLogger,
     ExceptionLogger,

@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import chalk from 'chalk'
+import { BaseLogger } from './base.logger'
+import { WinstonProvider } from '../providers'
+import { LogLevel } from '../types'
 
 interface AppConfig {
   appName: string
@@ -15,8 +18,15 @@ interface DatabaseConfig {
   database?: string
 }
 
+/**
+ * StartupLogger - Logger especializado para banners de inicio/cierre de la aplicación
+ *
+ * MEJORA:
+ * Ahora extiende BaseLogger y usa Winston, por lo que los logs de startup
+ * también se guardan en archivos (logs/app-YYYY-MM-DD.log)
+ */
 @Injectable()
-export class StartupLogger {
+export class StartupLogger extends BaseLogger {
   private readonly logo = `
   █████╗ ██╗   ██╗██████╗ ██╗████████╗     ██████╗ ██████╗ ██████╗ ███████╗
  ██╔══██╗██║   ██║██╔══██╗██║╚══██╔══╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
@@ -26,9 +36,13 @@ export class StartupLogger {
  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝        ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
   `
 
+  constructor(winstonProvider: WinstonProvider) {
+    super(winstonProvider.getLogger(), 'startup')
+  }
+
   printStartupBanner(appConfig: AppConfig, dbConfig?: DatabaseConfig): void {
+    // Mostrar banner visual en consola
     console.log(chalk.bold.white('═'.repeat(85)))
-    //console.clear()
     console.log(chalk.cyan(this.logo))
     console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
@@ -74,6 +88,7 @@ export class StartupLogger {
     }
 
     // Timestamp y estado
+    const url = `http://localhost:${appConfig.port}${appConfig.apiPrefix || ''}`
     console.log()
     console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
@@ -83,16 +98,36 @@ export class StartupLogger {
     )
     console.log(
       chalk.green('  ✓ Application is running on:'),
-      chalk.cyan.underline(
-        `http://localhost:${appConfig.port}${appConfig.apiPrefix || ''}`,
-      ),
+      chalk.cyan.underline(url),
     )
     console.log()
     console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
+
+    // NUEVO: También guardar en archivo para persistencia
+    this.info('Application started', {
+      additionalData: {
+        application: {
+          name: appConfig.appName,
+          version: appConfig.version,
+          environment: appConfig.nodeEnv,
+          port: appConfig.port,
+          apiPrefix: appConfig.apiPrefix,
+          url,
+        },
+        database: dbConfig
+          ? {
+              type: dbConfig.type,
+              host: dbConfig.host,
+              database: dbConfig.database,
+            }
+          : undefined,
+      },
+    })
   }
 
   printShutdown(reason?: string): void {
+    // Mostrar en consola
     console.log()
     console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
@@ -107,9 +142,18 @@ export class StartupLogger {
     console.log()
     console.log(chalk.bold.white('═'.repeat(85)))
     console.log()
+
+    // NUEVO: También guardar en archivo
+    this.warn('Application shutting down', {
+      additionalData: {
+        reason,
+        time: new Date().toLocaleString('es-ES'),
+      },
+    })
   }
 
   printError(error: Error, context?: string): void {
+    // Mostrar en consola
     console.log()
     console.log(chalk.bold.red('═'.repeat(85)))
     console.log(chalk.bold.red('  ✗ FATAL ERROR'))
@@ -127,14 +171,35 @@ export class StartupLogger {
     console.log()
     console.log(chalk.bold.red('═'.repeat(85)))
     console.log()
+
+    // NUEVO: También guardar en archivo
+    this.writeLog(LogLevel.ERROR, 'Fatal error during startup', {
+      additionalData: {
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        },
+        context,
+      },
+    })
   }
 
   printModuleLoaded(moduleName: string, details?: string): void {
+    // Mostrar en consola
     console.log(
       chalk.green('  ✓'),
       chalk.white(moduleName),
       details ? chalk.gray(`(${details})`) : '',
     )
+
+    // NUEVO: También guardar en archivo
+    this.debug(`Module loaded: ${moduleName}`, {
+      additionalData: {
+        module: moduleName,
+        details,
+      },
+    })
   }
 
   private printSection(

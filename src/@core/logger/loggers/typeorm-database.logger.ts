@@ -3,6 +3,7 @@ import { Logger as TypeOrmLogger, QueryRunner } from 'typeorm'
 import { format } from 'sql-formatter'
 import { BaseLogger } from './base.logger'
 import { DatabaseLogContext, UserContext, LogLevel } from '../types'
+import { WinstonProvider } from '../providers'
 
 interface DatabaseError {
   code?: string
@@ -16,8 +17,17 @@ export class TypeOrmDatabaseLogger extends BaseLogger implements TypeOrmLogger {
   private readonly slowQueryThreshold = 1000
   private readonly enableQueryFormatting = true
 
-  constructor() {
-    super('database')
+  constructor(winstonProvider: WinstonProvider) {
+    super(winstonProvider.getLogger(), 'database')
+  }
+
+  /**
+   * Crea una instancia standalone (fuera del contexto de NestJS)
+   * Útil para configuración de TypeORM en archivos de config
+   */
+  static createStandalone(): TypeOrmDatabaseLogger {
+    const provider = new WinstonProvider()
+    return new TypeOrmDatabaseLogger(provider)
   }
 
   /**

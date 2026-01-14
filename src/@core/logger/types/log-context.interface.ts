@@ -45,6 +45,7 @@ export interface BaseLogContext {
   correlationId?: string
   service?: string
   environment?: string
+  additionalData?: Record<string, unknown> // ← Datos adicionales genéricos
 }
 
 export interface HttpLogContext extends BaseLogContext {

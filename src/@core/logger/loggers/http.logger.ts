@@ -3,11 +3,12 @@ import { Request, Response } from 'express'
 import { BaseLogger } from './base.logger'
 import { HttpLogContext, UserContext, LogLevel } from '../types'
 import { UserAgentParser, DataSanitizer, IpExtractor } from '../utils'
+import { WinstonProvider } from '../providers'
 
 @Injectable()
 export class HttpLogger extends BaseLogger {
-  constructor() {
-    super('http')
+  constructor(winstonProvider: WinstonProvider) {
+    super(winstonProvider.getLogger(), 'http')
   }
 
   logRequest(req: Request, user?: UserContext): void {

@@ -19,7 +19,7 @@ function getDatabaseConfigForNestJS(): TypeOrmModuleOptions {
     type: 'postgres',
     synchronize: false,
     logging: process.env.NODE_ENV === 'development',
-    logger: new TypeOrmDatabaseLogger(),
+    logger: TypeOrmDatabaseLogger.createStandalone(),
     maxQueryExecutionTime: 1000,
     autoLoadEntities: true,
   }
