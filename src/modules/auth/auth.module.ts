@@ -110,11 +110,7 @@ import { LoginRateLimitPolicy, EmailOperationRateLimitPolicy } from './policies'
     // ========================================
     JwtStrategy,
     JwtRefreshStrategy,
-
-    // ========================================
-    // Guards
-    // ========================================
-    JwtAuthGuard, // Guard de autenticación JWT (local al módulo auth)
+    JwtAuthGuard,
     // ========================================
     // Global Guards (registrados como APP_GUARD)
     // ========================================

@@ -3,7 +3,7 @@ import { Transactional } from '@core/database'
 import { UserEntity, UserStatus } from '../../entities/user.entity'
 import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
-import { CacheService } from '@core/cache'
+import { EmailVerificationService } from '../../services'
 
 /**
  * Caso de uso: Verificar email de usuario
@@ -12,30 +12,42 @@ import { CacheService } from '@core/cache'
  * - Validar token de verificación
  * - Marcar email como verificado
  * - Activar usuario (cambiar status a ACTIVE)
- * - Eliminar token usado
+ *
+ * Flujo:
+ * 1. Usuario recibe email de invitación con link: /verify-email?token=<tokenId>
+ * 2. Usuario hace clic y llega a este endpoint
+ * 3. Validamos token, activamos usuario
+ *
+ * IMPORTANTE: El token se revoca automáticamente al consumirlo (one-time use)
  */
 @Injectable()
 export class VerifyEmailUseCase {
-  private readonly VERIFICATION_PREFIX = 'email-verification:'
-  private readonly VERIFICATION_TTL = 24 * 60 * 60 // 24 horas
-
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: IUsersRepository,
-    private readonly cacheService: CacheService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
+  /**
+   * Verifica el email de un usuario usando un token de invitación
+   *
+   * @param tokenId - Token UUID enviado por email
+   * @returns Usuario verificado y activado
+   * @throws {BadRequestException} Si el token es inválido o expiró
+   */
   @Transactional()
-  async execute(token: string): Promise<UserEntity> {
-    // 1. Buscar userId asociado al token en cache
-    const cacheKey = `${this.VERIFICATION_PREFIX}${token}`
-    const userId = await this.cacheService.get<string>(cacheKey)
+  async execute(tokenId: string): Promise<UserEntity> {
+    // 1. Consumir token (busca, valida y revoca automáticamente)
+    const tokenData =
+      await this.emailVerificationService.consumeToken(tokenId)
 
-    if (!userId) {
+    if (!tokenData) {
       throw new BadRequestException(
-        'Token de verificación inválido o expirado',
+        'Token de verificación inválido o expirado. Por favor, contacte al administrador para que le reenvíe la invitación.',
       )
     }
+
+    const { userId } = tokenData
 
     // 2. Buscar usuario
     const user = await this.usersRepository.findById(userId)
@@ -43,9 +55,9 @@ export class VerifyEmailUseCase {
       throw new BadRequestException('Usuario no encontrado')
     }
 
-    // 3. Verificar si ya está verificado
+    // 3. Verificar si ya está verificado (evitar doble procesamiento)
     if (user.emailVerified) {
-      return user // Ya estaba verificado, no hacer nada
+      return user // Ya estaba verificado
     }
 
     // 4. Marcar como verificado y activar
@@ -53,26 +65,8 @@ export class VerifyEmailUseCase {
     user.emailVerifiedAt = new Date()
     user.status = UserStatus.ACTIVE
 
-    // 5. Eliminar token del cache (solo se usa una vez)
-    await this.cacheService.del(cacheKey)
-
-    // 6. Guardar cambios
+    // 5. Guardar cambios
     return await this.usersRepository.save(user)
   }
-
-  /**
-   * Genera un token de verificación para un usuario
-   *
-   * @param userId - ID del usuario
-   * @returns Token de verificación (UUID)
-   */
-  async generateVerificationToken(userId: string): Promise<string> {
-    const token = crypto.randomUUID()
-    const cacheKey = `${this.VERIFICATION_PREFIX}${token}`
-
-    // Guardar userId asociado al token por 24 horas
-    await this.cacheService.set(cacheKey, userId, this.VERIFICATION_TTL)
-
-    return token
-  }
 }
+

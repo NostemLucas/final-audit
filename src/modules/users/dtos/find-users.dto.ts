@@ -1,27 +1,19 @@
-import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator'
+import { IsOptional, IsString, IsEnum } from 'class-validator'
 import { PaginationDto } from '@core/dtos'
-import { UserStatus, Role } from '../entities/user.entity'
-import { Transform } from 'class-transformer'
+import { UserStatus, Role, UserEntity } from '../entities/user.entity'
+import { IsIn } from '@core/i18n'
 
-/**
- * DTO para buscar usuarios con filtros específicos
- *
- * Extiende PaginationDto para heredar:
- * - page
- * - limit
- * - all
- * - sortBy
- * - sortOrder
- *
- * Y agrega filtros específicos de usuarios
- *
- * @example
- * ```
- * GET /users?page=1&limit=10&search=john&status=active&role=admin
- * GET /users?all=true&organizationId=123  // Todos los usuarios de org 123
- * GET /users?page=2&limit=20&sortBy=createdAt&sortOrder=ASC
- * ```
- */
+const USER_SORTABLE_FIELDS: (keyof UserEntity)[] = [
+  'image',
+  'lastNames',
+  'email',
+  'createdAt',
+  'organizationId',
+  'status',
+  'ci',
+  'phone',
+  'names',
+]
 export class FindUsersDto extends PaginationDto {
   /**
    * Búsqueda de texto libre
@@ -33,6 +25,8 @@ export class FindUsersDto extends PaginationDto {
 
   /**
    * Filtrar por estado del usuario
+   * Puede ser: active, inactive, suspended
+   * Si no se especifica, devuelve usuarios con cualquier estado
    */
   @IsOptional()
   @IsEnum(UserStatus)
@@ -52,15 +46,7 @@ export class FindUsersDto extends PaginationDto {
   @IsString()
   organizationId?: string
 
-  /**
-   * Solo usuarios activos (isActive = true)
-   */
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true
-    if (value === 'false') return false
-    return Boolean(value)
-  })
-  @IsBoolean()
-  onlyActive?: boolean
+  @IsIn(USER_SORTABLE_FIELDS)
+  sortBy?: string = 'createdAt'
 }

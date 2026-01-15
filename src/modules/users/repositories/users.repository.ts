@@ -1,14 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, FindOptionsWhere, ILike } from 'typeorm'
 import { TransactionService, AuditService } from '@core/database'
 import { BaseRepository } from '@core/repositories/base.repository'
-import { UserEntity, UserStatus } from '../entities/user.entity'
+import { UserEntity } from '../entities/user.entity'
 import { IUsersRepository } from './users-repository.interface'
-import {
-  PaginatedResponse,
-  PaginatedResponseBuilder,
-} from '@core/dtos'
+import { PaginatedResponse } from '@core/dtos'
 import { FindUsersDto } from '../dtos/find-users.dto'
 import { UserResponseDto } from '../dtos/user-response.dto'
 
@@ -129,134 +126,70 @@ export class UsersRepository
   }
 
   /**
-   * Paginación con filtros avanzados usando QueryBuilder
+   * Paginación de usuarios con filtros avanzados
    *
-   * ✅ Búsqueda OR en múltiples campos
-   * ✅ Filtro en array (roles)
-   * ✅ Relaciones (organization)
-   * ✅ Reutiliza PaginatedResponseBuilder del padre
+   * Soporta búsqueda por:
+   * - search: names, lastNames, email, username, ci (búsqueda de texto libre)
+   * - status: estado del usuario (active, inactive, suspended) - opcional
+   * - organizationId: filtrar por organización
    *
-   * @param findUsersDto - DTO con filtros y paginación
-   * @returns Paginación con UserEntity (sin mapear)
+   * NOTA: El filtro por 'role' requiere QueryBuilder ya que roles es un array.
+   * Si necesitas filtrar por rol, usa el método findByOrganization y filtra en memoria,
+   * o crea un método específico con QueryBuilder.
+   *
+   * @param query - DTO con filtros y opciones de paginación
+   * @returns Datos paginados con UserResponseDto
    */
-  async paginateWithFilters(
-    findUsersDto: FindUsersDto,
-  ): Promise<PaginatedResponse<UserEntity>> {
-    const {
-      sortOrder = 'DESC',
-      all = false,
-      limit = 10,
-      page = 1,
-      sortBy = 'createdAt',
-      onlyActive,
-      organizationId,
-      status,
-      role,
-      search,
-    } = findUsersDto
-
-    // Crear query builder con relación
-    const queryBuilder = this.getRepo()
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.organization', 'organization')
-
-    // ===== FILTROS COMPLEJOS =====
-
-    // Búsqueda OR (names, lastNames, email, username, ci)
-    if (search) {
-      queryBuilder.andWhere(
-        '(LOWER(user.names) LIKE :search OR ' +
-          'LOWER(user.lastNames) LIKE :search OR ' +
-          'LOWER(user.email) LIKE :search OR ' +
-          'LOWER(user.username) LIKE :search OR ' +
-          'user.ci LIKE :search)',
-        { search: `%${search.toLowerCase()}%` },
-      )
-    }
-
-    // Filtro en array (roles con ANY)
-    if (role) {
-      queryBuilder.andWhere(':role = ANY(user.roles)', { role })
-    }
-
-    // Filtros simples
-    if (status) {
-      queryBuilder.andWhere('user.status = :status', { status })
-    }
-
-    if (organizationId) {
-      queryBuilder.andWhere('user.organizationId = :organizationId', {
-        organizationId,
-      })
-    }
-
-    if (onlyActive) {
-      queryBuilder.andWhere('user.status = :activeStatus', {
-        activeStatus: UserStatus.ACTIVE,
-      })
-    }
-
-    // Aplicar ordenamiento
-    queryBuilder.orderBy(`user.${sortBy}`, sortOrder)
-
-    // ===== PAGINACIÓN =====
-
-    // Si all=true, devolver todos los registros
-    if (all) {
-      const allRecords = await queryBuilder.getMany()
-      // ✅ Reutiliza el builder del padre
-      return PaginatedResponseBuilder.createAll(allRecords)
-    }
-
-    // Paginación normal
-    const skip = (page - 1) * limit
-    queryBuilder.skip(skip).take(limit)
-
-    const [data, total] = await queryBuilder.getManyAndCount()
-
-    // ✅ Reutiliza el builder del padre
-    return PaginatedResponseBuilder.create(data, total, page, limit)
-  }
-
-  /**
-   * Paginación con filtros Y mapeo a UserResponseDto
-   *
-   * @param findUsersDto - DTO con filtros y paginación
-   * @returns Paginación con UserResponseDto (datos mapeados)
-   */
-  async paginateAndMap(
-    findUsersDto: FindUsersDto,
+  async paginateUsers(
+    query: FindUsersDto,
   ): Promise<PaginatedResponse<UserResponseDto>> {
-    // 1. Obtener datos paginados con filtros
-    const paginatedResult = await this.paginateWithFilters(findUsersDto)
+    const { search, status, organizationId } = query
 
-    // 2. Mapear cada UserEntity a UserResponseDto
-    const mappedData = paginatedResult.data.map((user) =>
-      this.mapToResponseDto(user),
+    // 1. Definimos los filtros fijos (AND)
+    const baseFilter: FindOptionsWhere<UserEntity> = {}
+
+    if (status) baseFilter.status = status
+    if (organizationId) baseFilter.organizationId = organizationId
+
+    // 2. Definimos la lógica de búsqueda (OR) combinada con el filtro base
+    // Si hay búsqueda, creamos un array de condiciones. Si no, usamos solo el baseFilter.
+    let where: FindOptionsWhere<UserEntity> | FindOptionsWhere<UserEntity>[] =
+      baseFilter
+
+    if (search) {
+      const searchTerm = ILike(`%${search}%`)
+      // Campos donde queremos buscar
+      const searchFields: Array<keyof UserEntity> = [
+        'names',
+        'lastNames',
+        'email',
+        'username',
+        'ci',
+      ]
+
+      where = searchFields.map((field) => ({
+        ...baseFilter,
+        [field]: searchTerm,
+      }))
+    }
+
+    return this.paginateWithMapper<UserResponseDto>(
+      query,
+      (user) => ({
+        id: user.id,
+        fullName: user.fullName,
+        createdAt: user.createdAt.toISOString(),
+        email: user.email,
+        username: user.username,
+        status: user.status,
+        roles: user.roles,
+        organizationName: user.organization?.name ?? 'Sin Organización',
+        imageUrl: user.image,
+      }),
+      {
+        where,
+        relations: { organization: true },
+      },
     )
-
-    // 3. Retornar la misma estructura con datos mapeados
-    return {
-      ...paginatedResult,
-      data: mappedData,
-    }
-  }
-
-  /**
-   * Mapea UserEntity a UserResponseDto
-   * @private
-   */
-  private mapToResponseDto(user: UserEntity): UserResponseDto {
-    return {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      username: user.username,
-      isActive: user.status === UserStatus.ACTIVE,
-      createdAt: user.createdAt.toISOString(),
-      roles: user.roles,
-      organizationName: user.organization?.name || '',
-      imageUrl: user.image || null,
-    }
   }
 }

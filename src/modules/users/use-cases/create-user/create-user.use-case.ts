@@ -1,17 +1,18 @@
 import { Injectable, Inject } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { Transactional } from '@core/database'
-import { EmailService } from '@core/email'
+import { LoggerService } from '@core/logger'
 import { CreateUserDto } from '../../dtos'
 import { UserEntity } from '../../entities/user.entity'
 import { UserValidator } from '../../validators/user.validator'
 import { UserFactory } from '../../factories/user.factory'
-import { VerifyEmailUseCase } from '../verify-email/verify-email.use-case'
+import { EmailVerificationService } from '../../services'
 import { USERS_REPOSITORY } from '../../tokens'
 import type { IUsersRepository } from '../../repositories'
 
 /**
  * Caso de uso: Crear un nuevo usuario
+ *
+ * SOLO para uso por ADMIN.
  *
  * Responsabilidades:
  * - Validar constraints únicas (email, username, CI)
@@ -19,7 +20,13 @@ import type { IUsersRepository } from '../../repositories'
  * - Validar roles exclusivos
  * - Crear entidad de usuario con datos normalizados
  * - Persistir el usuario en la base de datos
- * - Enviar email de verificación
+ * - Enviar email de invitación automáticamente
+ *
+ * Flujo:
+ * 1. Admin crea usuario → Usuario se crea con status=INACTIVE
+ * 2. Sistema envía email de invitación automáticamente
+ * 3. Usuario recibe email y verifica su cuenta
+ * 4. Usuario pasa a status=ACTIVE
  */
 @Injectable()
 export class CreateUserUseCase {
@@ -28,9 +35,8 @@ export class CreateUserUseCase {
     private readonly usersRepository: IUsersRepository,
     private readonly validator: UserValidator,
     private readonly userFactory: UserFactory,
-    private readonly verifyEmailUseCase: VerifyEmailUseCase,
-    private readonly emailService: EmailService,
-    private readonly configService: ConfigService,
+    private readonly emailVerificationService: EmailVerificationService,
+    private readonly logger: LoggerService,
   ) {}
 
   @Transactional()
@@ -48,24 +54,19 @@ export class CreateUserUseCase {
     const user = await this.userFactory.createFromDto(dto)
     const savedUser = await this.usersRepository.save(user)
 
-    // 3. Generar token de verificación
-    const verificationToken =
-      await this.verifyEmailUseCase.generateVerificationToken(savedUser.id)
-
-    // 4. Construir link de verificación
-    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000')
-    const verificationLink = `${appUrl}/verify-email?token=${verificationToken}`
-
-    // 5. Enviar email de verificación
+    // 3. Enviar email de invitación automáticamente
     try {
-      await this.emailService.sendVerificationEmail({
-        to: savedUser.email,
-        userName: savedUser.fullName,
-        verificationLink,
-      })
+      await this.emailVerificationService.generateAndSendInvitation(
+        savedUser.id,
+      )
+      this.logger.log(
+        `Email de invitación enviado a ${savedUser.email} (userId: ${savedUser.id})`,
+      )
     } catch (error) {
-      // Log error but don't fail user creation
-      console.error('Error sending verification email:', error)
+      this.logger.error(
+        `Error al enviar email de invitación a ${savedUser.email}:`,
+        error instanceof Error ? error.stack : String(error),
+      )
     }
 
     return savedUser

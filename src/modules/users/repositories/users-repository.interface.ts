@@ -1,8 +1,8 @@
 import { IBaseRepository } from '@core/repositories/base-repository.interface'
-import { PaginatedResponse } from '@core/dtos'
 import { UserEntity } from '../entities/user.entity'
-import { FindUsersDto } from '../dtos/find-users.dto'
 import { UserResponseDto } from '../dtos/user-response.dto'
+import { PaginatedResponse } from '@core/dtos'
+import { FindUsersDto } from '../dtos/find-users.dto'
 
 export interface IUsersRepository extends IBaseRepository<UserEntity> {
   // Búsquedas básicas
@@ -21,13 +21,8 @@ export interface IUsersRepository extends IBaseRepository<UserEntity> {
 
   // Contadores
   countUsersByOrganization(organizationId: string): Promise<number>
-
-  // Paginación con filtros
-  paginateWithFilters(
-    findUsersDto: FindUsersDto,
-  ): Promise<PaginatedResponse<UserEntity>>
-
-  paginateAndMap(
-    findUsersDto: FindUsersDto,
+  //
+  paginateUsers(
+    query: FindUsersDto,
   ): Promise<PaginatedResponse<UserResponseDto>>
 }
